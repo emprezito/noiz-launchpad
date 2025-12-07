@@ -11,6 +11,8 @@ interface UploadResult {
   success: boolean;
   ipfsHash?: string;
   url?: string;
+  audioUrl?: string;
+  imageUrl?: string;
   error?: string;
 }
 
@@ -190,6 +192,8 @@ export async function uploadTokenMetadata(
       success: true,
       ipfsHash: metadataResult.ipfsHash,
       url: metadataResult.url,
+      audioUrl: audioResult.url,
+      imageUrl: imageUrl,
     };
   } catch (error: any) {
     console.error("Token metadata upload error:", error);

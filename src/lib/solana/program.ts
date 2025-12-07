@@ -79,6 +79,7 @@ function encodeU64(value: bigint): Buffer {
 export interface CreateAudioTokenParams {
   name: string;
   symbol: string;
+  audioUri: string;
   metadataUri: string;
   totalSupply: bigint;
   initialPrice: bigint;
@@ -99,6 +100,7 @@ export async function createAudioTokenInstruction(
     CREATE_AUDIO_TOKEN_DISCRIMINATOR,
     encodeString(params.name),
     encodeString(params.symbol),
+    encodeString(params.audioUri),
     encodeString(params.metadataUri),
     encodeU64(params.totalSupply),
     encodeU64(params.initialPrice),

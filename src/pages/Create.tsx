@@ -128,6 +128,7 @@ const CreatePage = () => {
       toast.success("Files uploaded to IPFS!");
       
       const metadataUri = uploadResult.url!;
+      const audioUri = uploadResult.audioUrl!;
 
       // Generate a new mint keypair
       const mintKeypair = Keypair.generate();
@@ -136,6 +137,7 @@ const CreatePage = () => {
       const params: CreateAudioTokenParams = {
         name,
         symbol,
+        audioUri,
         metadataUri,
         totalSupply: BigInt(1_000_000_000 * 1e9), // 1 billion tokens with 9 decimals
         initialPrice: BigInt(10_000), // 0.00001 SOL initial price
