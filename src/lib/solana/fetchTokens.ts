@@ -1,4 +1,4 @@
-import { Connection, PublicKey, GetProgramAccountsFilter } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID, AUDIO_TOKEN_SEED, BONDING_CURVE_SEED } from "./idl";
 
 const programId = new PublicKey(PROGRAM_ID);
@@ -32,6 +32,15 @@ export interface TokenWithCurve {
   currentPrice: number;
 }
 
+// Account sizes based on Anchor's InitSpace macro:
+// AudioToken: 8 (discriminator) + 32 (authority) + 4+50 (name) + 4+10 (symbol) + 4+200 (audio_uri) + 32 (mint) + 8 (total_supply) + 8 (created_at) + 1 (bump)
+// = 8 + 32 + 54 + 14 + 204 + 32 + 8 + 8 + 1 = 361 bytes max
+const AUDIO_TOKEN_SIZE = 361;
+
+// BondingCurve: 8 (discriminator) + 32 (mint) + 32 (creator) + 8 (sol_reserves) + 8 (token_reserves) + 8 (initial_price) + 8 (tokens_sold) + 1 (bump)
+// = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 1 = 105 bytes
+const BONDING_CURVE_SIZE = 105;
+
 // Parse AudioToken account data
 function parseAudioTokenAccount(pubkey: PublicKey, data: Buffer): AudioTokenAccount | null {
   try {
@@ -45,21 +54,21 @@ function parseAudioTokenAccount(pubkey: PublicKey, data: Buffer): AudioTokenAcco
     // Read name
     const nameLen = data.readUInt32LE(offset);
     offset += 4;
-    if (offset + nameLen > data.length) return null;
+    if (offset + nameLen > data.length || nameLen > 50) return null;
     const name = data.slice(offset, offset + nameLen).toString("utf-8");
     offset += nameLen;
 
     // Read symbol
     const symbolLen = data.readUInt32LE(offset);
     offset += 4;
-    if (offset + symbolLen > data.length) return null;
+    if (offset + symbolLen > data.length || symbolLen > 10) return null;
     const symbol = data.slice(offset, offset + symbolLen).toString("utf-8");
     offset += symbolLen;
 
     // Read audio URI
     const audioUriLen = data.readUInt32LE(offset);
     offset += 4;
-    if (offset + audioUriLen > data.length) return null;
+    if (offset + audioUriLen > data.length || audioUriLen > 200) return null;
     const audioUri = data.slice(offset, offset + audioUriLen).toString("utf-8");
     offset += audioUriLen;
 
@@ -96,7 +105,7 @@ function parseAudioTokenAccount(pubkey: PublicKey, data: Buffer): AudioTokenAcco
 // Parse BondingCurve account data
 function parseBondingCurveAccount(pubkey: PublicKey, data: Buffer): BondingCurveAccount | null {
   try {
-    if (data.length < 89) return null;
+    if (data.length < BONDING_CURVE_SIZE) return null;
     
     let offset = 8; // Skip discriminator
     
@@ -139,18 +148,19 @@ function parseBondingCurveAccount(pubkey: PublicKey, data: Buffer): BondingCurve
 // Fetch all audio tokens from the program
 export async function fetchAllAudioTokens(connection: Connection): Promise<AudioTokenAccount[]> {
   try {
-    const accounts = await connection.getProgramAccounts(programId, {
-      filters: [
-        { dataSize: 339 }, // Approximate size of AudioToken account
-      ],
-    });
+    // Fetch accounts owned by program - AudioToken accounts have variable size due to strings
+    // We'll fetch all program accounts and filter by discriminator
+    const accounts = await connection.getProgramAccounts(programId);
 
     const tokens: AudioTokenAccount[] = [];
     
     for (const { pubkey, account } of accounts) {
-      const parsed = parseAudioTokenAccount(pubkey, account.data);
-      if (parsed) {
-        tokens.push(parsed);
+      // Try to parse as AudioToken - if it fails, it's probably a BondingCurve
+      if (account.data.length >= 100 && account.data.length <= AUDIO_TOKEN_SIZE) {
+        const parsed = parseAudioTokenAccount(pubkey, account.data);
+        if (parsed) {
+          tokens.push(parsed);
+        }
       }
     }
 
@@ -166,7 +176,7 @@ export async function fetchAllBondingCurves(connection: Connection): Promise<Bon
   try {
     const accounts = await connection.getProgramAccounts(programId, {
       filters: [
-        { dataSize: 89 }, // Size of BondingCurve account
+        { dataSize: BONDING_CURVE_SIZE },
       ],
     });
 
@@ -210,6 +220,14 @@ export async function fetchAllTokensWithCurves(connection: Connection): Promise<
       currentPrice,
     };
   });
+}
+
+// Get audio token PDA for a mint
+export function getAudioTokenPDA(mint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(AUDIO_TOKEN_SEED), mint.toBuffer()],
+    programId
+  );
 }
 
 // Get bonding curve PDA for a mint

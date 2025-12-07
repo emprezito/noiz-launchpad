@@ -127,18 +127,17 @@ const CreatePage = () => {
       setUploadingIPFS(false);
       toast.success("Files uploaded to IPFS!");
       
+      // The metadataUri contains all the info (including audio URL inside it)
       const metadataUri = uploadResult.url!;
-      const audioUri = uploadResult.audioUrl!;
 
       // Generate a new mint keypair
       const mintKeypair = Keypair.generate();
 
-      // Create the instruction
+      // Create the instruction - matching Anchor's create_audio_token_with_curve
       const params: CreateAudioTokenParams = {
         name,
         symbol,
-        audioUri,
-        metadataUri,
+        metadataUri, // IPFS URL to the full metadata JSON
         totalSupply: BigInt(1_000_000_000 * 1e9), // 1 billion tokens with 9 decimals
         initialPrice: BigInt(10_000), // 0.00001 SOL initial price
       };
