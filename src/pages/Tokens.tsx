@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useConnection } from "@solana/wallet-adapter-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, RefreshCw, TrendingUp, Sparkles, Play, Pause } from "lucide-react";
+import { Search, RefreshCw, TrendingUp, Sparkles, Play, Pause, Wifi, WifiOff } from "lucide-react";
+import { fetchAllTokensWithCurves, TokenWithCurve, getBondingCurvePDA } from "@/lib/solana/fetchTokens";
+import { PublicKey } from "@solana/web3.js";
 
 interface AudioTokenData {
   mint: string;
@@ -22,7 +25,7 @@ interface AudioTokenData {
   };
 }
 
-// Demo tokens for UI showcase
+// Demo tokens for fallback
 const DEMO_TOKENS: AudioTokenData[] = [
   {
     mint: "8m6HBVw1n2q6E3YWTk...",
@@ -54,52 +57,128 @@ const DEMO_TOKENS: AudioTokenData[] = [
       price: 0.00003333,
     },
   },
-  {
-    mint: "3j4HBVw1n2q6E3YWTk...",
-    name: "Oof Sound",
-    symbol: "OOF",
-    audioUri: "",
-    authority: "2Lp...ghi",
-    totalSupply: "1000000000",
-    createdAt: Date.now() - 259200000,
-    bondingCurveData: {
-      solReserves: "8000000000",
-      tokenReserves: "920000000000000000",
-      tokensSold: "80000000000000000",
-      price: 0.0000087,
-    },
-  },
-  {
-    mint: "5m8HBVw1n2q6E3YWTk...",
-    name: "Sad Violin",
-    symbol: "SAD",
-    audioUri: "",
-    authority: "4Mp...jkl",
-    totalSupply: "1000000000",
-    createdAt: Date.now() - 345600000,
-    bondingCurveData: {
-      solReserves: "42000000000",
-      tokenReserves: "600000000000000000",
-      tokensSold: "400000000000000000",
-      price: 0.00007,
-    },
-  },
 ];
 
 const TokensPage = () => {
+  const { connection } = useConnection();
   const [tokens, setTokens] = useState<AudioTokenData[]>(DEMO_TOKENS);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "trending" | "new">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLive, setIsLive] = useState(false);
+  const [subscriptionIds, setSubscriptionIds] = useState<number[]>([]);
 
-  const fetchAllTokens = () => {
+  // Convert blockchain data to UI format
+  const convertToUIFormat = useCallback((tokensWithCurves: TokenWithCurve[]): AudioTokenData[] => {
+    return tokensWithCurves.map(({ audioToken, bondingCurve, currentPrice }) => ({
+      mint: audioToken.mint,
+      name: audioToken.name,
+      symbol: audioToken.symbol,
+      audioUri: audioToken.audioUri,
+      authority: audioToken.authority,
+      totalSupply: String(audioToken.totalSupply * 1e9),
+      createdAt: audioToken.createdAt,
+      bondingCurveData: bondingCurve ? {
+        solReserves: String(bondingCurve.solReserves * 1e9),
+        tokenReserves: String(bondingCurve.tokenReserves * 1e9),
+        tokensSold: String(bondingCurve.tokensSold * 1e9),
+        price: currentPrice,
+      } : undefined,
+    }));
+  }, []);
+
+  // Fetch tokens from blockchain
+  const fetchAllTokens = useCallback(async () => {
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const tokensWithCurves = await fetchAllTokensWithCurves(connection);
+      
+      if (tokensWithCurves.length > 0) {
+        const uiTokens = convertToUIFormat(tokensWithCurves);
+        setTokens(uiTokens);
+        
+        // Set up real-time subscriptions
+        setupSubscriptions(tokensWithCurves);
+      } else {
+        // Use demo data if no tokens found
+        setTokens(DEMO_TOKENS);
+      }
+    } catch (error) {
+      console.error("Error fetching tokens:", error);
       setTokens(DEMO_TOKENS);
-      setLoading(false);
-    }, 1000);
-  };
+    }
+    setLoading(false);
+  }, [connection, convertToUIFormat]);
+
+  // Set up WebSocket subscriptions for real-time updates
+  const setupSubscriptions = useCallback((tokensWithCurves: TokenWithCurve[]) => {
+    // Clean up existing subscriptions
+    subscriptionIds.forEach(id => {
+      connection.removeAccountChangeListener(id);
+    });
+
+    const newIds: number[] = [];
+
+    tokensWithCurves.forEach(({ audioToken, bondingCurve }) => {
+      if (bondingCurve) {
+        try {
+          const [curvePDA] = getBondingCurvePDA(new PublicKey(audioToken.mint));
+          
+          const subId = connection.onAccountChange(
+            curvePDA,
+            (accountInfo) => {
+              // Update token price in real-time
+              const data = accountInfo.data;
+              if (data.length >= 89) {
+                let offset = 8 + 32 + 32; // Skip discriminator, mint, creator
+                const solReserves = Number(data.readBigUInt64LE(offset)) / 1e9;
+                offset += 8;
+                const tokenReserves = Number(data.readBigUInt64LE(offset)) / 1e9;
+                
+                const newPrice = tokenReserves > 0 ? solReserves / tokenReserves : 0;
+                
+                setTokens(prev => prev.map(t => {
+                  if (t.mint === audioToken.mint && t.bondingCurveData) {
+                    return {
+                      ...t,
+                      bondingCurveData: {
+                        ...t.bondingCurveData,
+                        solReserves: String(solReserves * 1e9),
+                        tokenReserves: String(tokenReserves * 1e9),
+                        price: newPrice,
+                      },
+                    };
+                  }
+                  return t;
+                }));
+              }
+            },
+            "confirmed"
+          );
+          newIds.push(subId);
+        } catch (error) {
+          console.error("Error setting up subscription:", error);
+        }
+      }
+    });
+
+    setSubscriptionIds(newIds);
+    setIsLive(newIds.length > 0);
+  }, [connection, subscriptionIds]);
+
+  // Cleanup subscriptions on unmount
+  useEffect(() => {
+    return () => {
+      subscriptionIds.forEach(id => {
+        connection.removeAccountChangeListener(id);
+      });
+    };
+  }, []);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchAllTokens();
+  }, []);
 
   const filteredTokens = tokens
     .filter((token) => {
@@ -132,11 +211,20 @@ const TokensPage = () => {
       <main className="pt-20 pb-12">
         <div className="container mx-auto px-4">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold mb-2 font-display">🎵 Audio Tokens</h1>
-            <p className="text-primary-foreground/60">
-              Discover and trade audio meme tokens
-            </p>
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2 font-display">🎵 Audio Tokens</h1>
+              <p className="text-primary-foreground/60">
+                Discover and trade audio meme tokens
+              </p>
+            </div>
+            {/* Live Indicator */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+              isLive ? "bg-noiz-green/20 text-noiz-green" : "bg-muted text-muted-foreground"
+            }`}>
+              {isLive ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+              {isLive ? "Live" : "Demo Mode"}
+            </div>
           </div>
 
           {/* Search & Filters Bar */}

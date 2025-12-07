@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Search, TrendingUp, TrendingDown, Loader2, Play, Pause, ArrowLeft, ExternalLink, AlertCircle } from "lucide-react";
+import { Search, TrendingUp, TrendingDown, Loader2, Play, Pause, ArrowLeft, ExternalLink, AlertCircle, Wifi, WifiOff } from "lucide-react";
 import { Area, AreaChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { 
   fetchBondingCurve, 
@@ -17,7 +17,8 @@ import {
   buyTokensInstruction, 
   sellTokensInstruction,
   calculateBuyPrice,
-  calculateSellReturn 
+  calculateSellReturn,
+  getBondingCurvePDA 
 } from "@/lib/solana/program";
 
 interface TokenInfo {
@@ -72,8 +73,72 @@ const TradePage = () => {
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [userBalance, setUserBalance] = useState("0");
   const [playing, setPlaying] = useState(false);
-  const [chartData] = useState(generateChartData());
+  const [chartData, setChartData] = useState(generateChartData());
   const [transactions] = useState<TradeTransaction[]>(DEMO_TRANSACTIONS);
+  const [isLive, setIsLive] = useState(false);
+  const [subscriptionId, setSubscriptionId] = useState<number | null>(null);
+
+  // Set up real-time price subscription
+  useEffect(() => {
+    if (!activeMint || !tokenInfo) return;
+
+    try {
+      const mintPubkey = new PublicKey(activeMint);
+      const [curvePDA] = getBondingCurvePDA(mintPubkey);
+
+      const subId = connection.onAccountChange(
+        curvePDA,
+        (accountInfo) => {
+          const data = accountInfo.data;
+          if (data.length >= 89) {
+            let offset = 8 + 32 + 32; // Skip discriminator, mint, creator
+            const solReserves = Number(data.readBigUInt64LE(offset)) / 1e9;
+            offset += 8;
+            const tokenReserves = Number(data.readBigUInt64LE(offset)) / 1e9;
+            
+            const newPrice = tokenReserves > 0 ? solReserves / tokenReserves : 0;
+            
+            setTokenInfo(prev => prev ? {
+              ...prev,
+              price: newPrice,
+              solReserves,
+              tokenReserves,
+            } : null);
+
+            // Add to chart data
+            setChartData(prev => {
+              const newData = [...prev.slice(1), {
+                time: new Date().toLocaleTimeString().slice(0, 5),
+                price: newPrice,
+                volume: Math.random() * 5,
+              }];
+              return newData;
+            });
+          }
+        },
+        "confirmed"
+      );
+
+      setSubscriptionId(subId);
+      setIsLive(true);
+
+      return () => {
+        connection.removeAccountChangeListener(subId);
+        setIsLive(false);
+      };
+    } catch (error) {
+      console.error("Error setting up subscription:", error);
+    }
+  }, [activeMint, tokenInfo?.mint]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (subscriptionId !== null) {
+        connection.removeAccountChangeListener(subscriptionId);
+      }
+    };
+  }, [subscriptionId]);
 
   useEffect(() => {
     if (activeMint) loadTokenInfo();
@@ -212,8 +277,18 @@ const TradePage = () => {
                     <button onClick={() => setPlaying(!playing)} className="w-20 h-20 gradient-primary rounded-2xl flex items-center justify-center">
                       {playing ? <Pause className="w-8 h-8 text-primary-foreground" /> : <Play className="w-8 h-8 text-primary-foreground ml-1" />}
                     </button>
-                    <div>
-                      <h2 className="text-2xl font-bold">{tokenInfo.name} <span className="px-2 py-1 bg-noiz-purple/20 text-noiz-purple rounded-lg text-sm">${tokenInfo.symbol}</span></h2>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold">{tokenInfo.name}</h2>
+                        <span className="px-2 py-1 bg-noiz-purple/20 text-noiz-purple rounded-lg text-sm">${tokenInfo.symbol}</span>
+                        {/* Live Indicator */}
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+                          isLive ? "bg-noiz-green/20 text-noiz-green" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {isLive ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                          {isLive ? "Live" : "Static"}
+                        </div>
+                      </div>
                       <div className="mt-4 grid grid-cols-4 gap-4 text-sm">
                         <div><p className="text-muted-foreground">Price</p><p className="font-bold text-noiz-purple">{tokenInfo.price.toFixed(8)} SOL</p></div>
                         <div><p className="text-muted-foreground">Liquidity</p><p className="font-bold text-noiz-green">{tokenInfo.solReserves.toFixed(2)} SOL</p></div>

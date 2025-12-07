@@ -25,14 +25,14 @@ const PLATFORM_FEE_ACCOUNT = new PublicKey(
 export const programId = new PublicKey(PROGRAM_ID);
 
 // Derive PDAs
-export async function getAudioTokenPDA(mint: PublicKey): Promise<[PublicKey, number]> {
+export function getAudioTokenPDA(mint: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from(AUDIO_TOKEN_SEED), mint.toBuffer()],
     programId
   );
 }
 
-export async function getBondingCurvePDA(mint: PublicKey): Promise<[PublicKey, number]> {
+export function getBondingCurvePDA(mint: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from(BONDING_CURVE_SEED), mint.toBuffer()],
     programId
