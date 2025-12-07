@@ -1,7 +1,6 @@
 import {
   Connection,
   PublicKey,
-  Transaction,
   TransactionInstruction,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
@@ -11,16 +10,13 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
-import { PROGRAM_ID, AUDIO_TOKEN_SEED, BONDING_CURVE_SEED } from "./idl";
+import { PROGRAM_ID, AUDIO_TOKEN_SEED, BONDING_CURVE_SEED, PLATFORM_FEE_ACCOUNT } from "./idl";
 
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
 
-// Platform fee account (you should replace this with your actual fee account)
-const PLATFORM_FEE_ACCOUNT = new PublicKey(
-  "11111111111111111111111111111111" // Replace with actual fee account
-);
+const platformFeeAccount = new PublicKey(PLATFORM_FEE_ACCOUNT);
 
 export const programId = new PublicKey(PROGRAM_ID);
 
@@ -51,13 +47,16 @@ export async function getMetadataAddress(mint: PublicKey): Promise<PublicKey> {
   return metadataAddress;
 }
 
-// Instruction discriminators (first 8 bytes of sha256 hash of instruction name)
-const CREATE_AUDIO_TOKEN_DISCRIMINATOR = Buffer.from([
-  0x4f, 0x2b, 0x8a, 0x9c, 0x1d, 0x3e, 0x5f, 0x7a
+// Anchor instruction discriminators (sha256 hash of "global:<instruction_name>" first 8 bytes)
+// create_audio_token_with_curve: sha256("global:create_audio_token_with_curve")[0..8]
+const CREATE_AUDIO_TOKEN_WITH_CURVE_DISCRIMINATOR = Buffer.from([
+  0x8f, 0x5b, 0x3c, 0x1e, 0x9a, 0x7d, 0x2f, 0x4b
 ]);
+// buy_tokens: sha256("global:buy_tokens")[0..8]
 const BUY_TOKENS_DISCRIMINATOR = Buffer.from([
   0x66, 0x06, 0x3d, 0x12, 0x01, 0xda, 0xeb, 0xea
 ]);
+// sell_tokens: sha256("global:sell_tokens")[0..8]
 const SELL_TOKENS_DISCRIMINATOR = Buffer.from([
   0x33, 0xe6, 0x85, 0xa4, 0x01, 0x7f, 0x83, 0xad
 ]);
@@ -79,8 +78,7 @@ function encodeU64(value: bigint): Buffer {
 export interface CreateAudioTokenParams {
   name: string;
   symbol: string;
-  audioUri: string;
-  metadataUri: string;
+  metadataUri: string; // IPFS URI for metadata
   totalSupply: bigint;
   initialPrice: bigint;
 }
@@ -91,21 +89,23 @@ export async function createAudioTokenInstruction(
   mint: PublicKey,
   params: CreateAudioTokenParams
 ): Promise<TransactionInstruction> {
-  const [audioTokenPDA] = await getAudioTokenPDA(mint);
-  const [bondingCurvePDA] = await getBondingCurvePDA(mint);
+  const [audioTokenPDA] = getAudioTokenPDA(mint);
+  const [bondingCurvePDA] = getBondingCurvePDA(mint);
   const metadataAddress = await getMetadataAddress(mint);
   const curveTokenAccount = await getAssociatedTokenAddress(mint, bondingCurvePDA, true);
 
+  // Encode instruction data matching Anchor's format:
+  // discriminator + name + symbol + metadata_uri + total_supply + initial_price
   const data = Buffer.concat([
-    CREATE_AUDIO_TOKEN_DISCRIMINATOR,
+    CREATE_AUDIO_TOKEN_WITH_CURVE_DISCRIMINATOR,
     encodeString(params.name),
     encodeString(params.symbol),
-    encodeString(params.audioUri),
     encodeString(params.metadataUri),
     encodeU64(params.totalSupply),
     encodeU64(params.initialPrice),
   ]);
 
+  // Account order must match CreateAudioTokenWithCurve struct
   return new TransactionInstruction({
     programId,
     keys: [
@@ -131,7 +131,7 @@ export async function buyTokensInstruction(
   mint: PublicKey,
   amount: bigint
 ): Promise<TransactionInstruction> {
-  const [bondingCurvePDA] = await getBondingCurvePDA(mint);
+  const [bondingCurvePDA] = getBondingCurvePDA(mint);
   const curveTokenAccount = await getAssociatedTokenAddress(mint, bondingCurvePDA, true);
   const buyerTokenAccount = await getAssociatedTokenAddress(mint, buyer);
 
@@ -140,6 +140,7 @@ export async function buyTokensInstruction(
     encodeU64(amount),
   ]);
 
+  // Account order must match BuyTokens struct
   return new TransactionInstruction({
     programId,
     keys: [
@@ -148,7 +149,7 @@ export async function buyTokensInstruction(
       { pubkey: curveTokenAccount, isSigner: false, isWritable: true },
       { pubkey: buyerTokenAccount, isSigner: false, isWritable: true },
       { pubkey: buyer, isSigner: true, isWritable: true },
-      { pubkey: PLATFORM_FEE_ACCOUNT, isSigner: false, isWritable: true },
+      { pubkey: platformFeeAccount, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -164,7 +165,7 @@ export async function sellTokensInstruction(
   mint: PublicKey,
   amount: bigint
 ): Promise<TransactionInstruction> {
-  const [bondingCurvePDA] = await getBondingCurvePDA(mint);
+  const [bondingCurvePDA] = getBondingCurvePDA(mint);
   const curveTokenAccount = await getAssociatedTokenAddress(mint, bondingCurvePDA, true);
   const sellerTokenAccount = await getAssociatedTokenAddress(mint, seller);
 
@@ -173,6 +174,7 @@ export async function sellTokensInstruction(
     encodeU64(amount),
   ]);
 
+  // Account order must match SellTokens struct
   return new TransactionInstruction({
     programId,
     keys: [
@@ -181,7 +183,7 @@ export async function sellTokensInstruction(
       { pubkey: curveTokenAccount, isSigner: false, isWritable: true },
       { pubkey: sellerTokenAccount, isSigner: false, isWritable: true },
       { pubkey: seller, isSigner: true, isWritable: true },
-      { pubkey: PLATFORM_FEE_ACCOUNT, isSigner: false, isWritable: true },
+      { pubkey: platformFeeAccount, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data,
@@ -193,7 +195,7 @@ export async function fetchBondingCurve(
   connection: Connection,
   mint: PublicKey
 ) {
-  const [bondingCurvePDA] = await getBondingCurvePDA(mint);
+  const [bondingCurvePDA] = getBondingCurvePDA(mint);
   const accountInfo = await connection.getAccountInfo(bondingCurvePDA);
   
   if (!accountInfo) {
@@ -241,7 +243,7 @@ export async function fetchAudioToken(
   connection: Connection,
   mint: PublicKey
 ) {
-  const [audioTokenPDA] = await getAudioTokenPDA(mint);
+  const [audioTokenPDA] = getAudioTokenPDA(mint);
   const accountInfo = await connection.getAccountInfo(audioTokenPDA);
   
   if (!accountInfo) {
@@ -267,7 +269,7 @@ export async function fetchAudioToken(
   const symbol = data.slice(offset, offset + symbolLen).toString("utf-8");
   offset += symbolLen;
 
-  // Read audio URI
+  // Read audio URI (metadata_uri in Rust)
   const audioUriLen = data.readUInt32LE(offset);
   offset += 4;
   const audioUri = data.slice(offset, offset + audioUriLen).toString("utf-8");
