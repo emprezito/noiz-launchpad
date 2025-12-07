@@ -62,9 +62,9 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
         noiz: {
-          green: "hsl(var(--noiz-green))",
-          blue: "hsl(var(--noiz-blue))",
           purple: "hsl(var(--noiz-purple))",
+          violet: "hsl(var(--noiz-violet))",
+          blue: "hsl(var(--noiz-blue))",
           red: "hsl(var(--noiz-red))",
           yellow: "hsl(var(--noiz-yellow))",
           orange: "hsl(var(--noiz-orange))",
