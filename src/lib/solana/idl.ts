@@ -1,5 +1,5 @@
 // Audio Token Platform IDL for Anchor 0.30.1
-export const PROGRAM_ID = "BdLFRJjL3SU84L783JgTeDyyuNgQCqa5KD4148f5UX2q";
+export const PROGRAM_ID = "9m8ApaLxscUk6VhsuN12imf6ZvuCqPt42uDJMA1eRe7Y";
 
 // PDA seeds
 export const AUDIO_TOKEN_SEED = "audio_token";
@@ -10,7 +10,7 @@ export const PLATFORM_FEE_ACCOUNT = "GVHjPM3DfTnSFLMx72RcCCAViqWWsJ6ENKXRq7nWedE
 
 // Full IDL JSON from the deployed program
 export const IDL = {
-  "address": "BdLFRJjL3SU84L783JgTeDyyuNgQCqa5KD4148f5UX2q",
+  "address": "9m8ApaLxscUk6VhsuN12imf6ZvuCqPt42uDJMA1eRe7Y",
   "metadata": {
     "name": "audio_token_platform",
     "version": "0.1.0",
