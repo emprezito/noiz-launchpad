@@ -147,6 +147,36 @@ export type Database = {
           },
         ]
       }
+      user_badges: {
+        Row: {
+          badge_level: string
+          earned_at: string
+          id: string
+          mint_address: string | null
+          minted: boolean | null
+          minted_at: string | null
+          wallet_address: string
+        }
+        Insert: {
+          badge_level: string
+          earned_at?: string
+          id?: string
+          mint_address?: string | null
+          minted?: boolean | null
+          minted_at?: string | null
+          wallet_address: string
+        }
+        Update: {
+          badge_level?: string
+          earned_at?: string
+          id?: string
+          mint_address?: string | null
+          minted?: boolean | null
+          minted_at?: string | null
+          wallet_address?: string
+        }
+        Relationships: []
+      }
       user_interactions: {
         Row: {
           audio_clip_id: string | null
@@ -183,22 +213,31 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          referral_code: string | null
+          referred_by: string | null
           total_points: number | null
           updated_at: string
+          username: string | null
           wallet_address: string
         }
         Insert: {
           created_at?: string
           id?: string
+          referral_code?: string | null
+          referred_by?: string | null
           total_points?: number | null
           updated_at?: string
+          username?: string | null
           wallet_address: string
         }
         Update: {
           created_at?: string
           id?: string
+          referral_code?: string | null
+          referred_by?: string | null
           total_points?: number | null
           updated_at?: string
+          username?: string | null
           wallet_address?: string
         }
         Relationships: []
@@ -247,7 +286,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_referral_code: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
