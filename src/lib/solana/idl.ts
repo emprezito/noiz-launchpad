@@ -26,5 +26,5 @@ export interface BondingCurve {
 export const AUDIO_TOKEN_SEED = "audio_token";
 export const BONDING_CURVE_SEED = "bonding_curve";
 
-// Platform fee account - UPDATE THIS to your actual fee receiving wallet
-export const PLATFORM_FEE_ACCOUNT = "11111111111111111111111111111111";
+// Platform fee account - receives 0.25% trading fees
+export const PLATFORM_FEE_ACCOUNT = "GVHjPM3DfTnSFLMx72RcCCAViqWWsJ6ENKXRq7nWedEp";
