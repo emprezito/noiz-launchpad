@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Music, Image, Check, Loader2, AlertCircle, Settings } from "lucide-react";
 import { createAudioTokenInstruction, CreateAudioTokenParams } from "@/lib/solana/program";
 import { uploadTokenMetadata } from "@/lib/pinata";
+import { useSolPrice } from "@/hooks/useSolPrice";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,7 @@ const PINATA_SECRET_STORAGE = "noizlabs_pinata_secret";
 const CreatePage = () => {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
-  
+  const { formatUsd } = useSolPrice();
   const [route, setRoute] = useState<TokenCreationRoute>("bonding-curve");
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -334,7 +335,7 @@ const CreatePage = () => {
                     </div>
                     <div className="mt-4 pt-4 border-t border-border">
                       <span className="text-xl font-bold text-primary">0.02 SOL</span>
-                      <span className="text-sm text-muted-foreground ml-2">($4)</span>
+                      <span className="text-sm text-muted-foreground ml-2">({formatUsd(0.02)})</span>
                     </div>
                   </button>
 
@@ -382,8 +383,8 @@ const CreatePage = () => {
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-border">
-                      <span className="text-xl font-bold text-accent">0.5 SOL+</span>
-                      <span className="text-sm text-muted-foreground ml-2">($100+)</span>
+                      <span className="text-xl font-bold text-accent">{calculateCost()} SOL</span>
+                      <span className="text-sm text-muted-foreground ml-2">({formatUsd(calculateCost())})</span>
                     </div>
                   </button>
                 </div>
