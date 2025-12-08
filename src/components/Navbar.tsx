@@ -9,6 +9,7 @@ const navigation = [
   { name: "Create", href: "/create" },
   { name: "Trade", href: "/trade" },
   { name: "Discover", href: "/discover" },
+  { name: "Leaderboard", href: "/leaderboard" },
 ];
 
 const Navbar = () => {
