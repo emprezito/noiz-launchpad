@@ -298,6 +298,9 @@ export async function fetchAudioToken(
   };
 }
 
+// Platform fee percentage (0.25%)
+export const PLATFORM_FEE_PERCENT = 0.0025;
+
 // Calculate buy price based on constant product formula
 export function calculateBuyPrice(
   tokenAmount: number,
@@ -312,7 +315,7 @@ export function calculateBuyPrice(
   const newTokenReserves = tokenReserves - tokenAmount;
   const newSolReserves = k / newTokenReserves;
   const solNeeded = newSolReserves - solReserves;
-  const platformFee = solNeeded * 0.01; // 1% fee
+  const platformFee = solNeeded * PLATFORM_FEE_PERCENT; // 0.25% fee
   
   return solNeeded + platformFee;
 }
@@ -327,7 +330,7 @@ export function calculateSellReturn(
   const newTokenReserves = tokenReserves + tokenAmount;
   const newSolReserves = k / newTokenReserves;
   const solToReturn = solReserves - newSolReserves;
-  const sellFee = solToReturn * 0.02; // 2% fee
+  const sellFee = solToReturn * PLATFORM_FEE_PERCENT; // 0.25% fee
   
   return solToReturn - sellFee;
 }
