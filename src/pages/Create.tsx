@@ -12,6 +12,8 @@ import { Music, Image, Check, Loader2, AlertCircle, Shield, AlertTriangle } from
 import { createAudioTokenWithCurve, CreateAudioTokenParams } from "@/lib/solana/program";
 import { uploadTokenMetadata } from "@/lib/ipfsUpload";
 import { useSolPrice } from "@/hooks/useSolPrice";
+import { updateTaskProgress, ensureUserTasks } from "@/lib/taskUtils";
+import { supabase } from "@/integrations/supabase/client";
 
 type TokenCreationRoute = "bonding-curve" | "manual-lp";
 
@@ -147,7 +149,32 @@ const CreatePage = () => {
       const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(signature, "confirmed");
 
-      setMintAddress(mintKeypair.publicKey.toString());
+      const walletAddress = publicKey.toString();
+      const mintAddr = mintKeypair.publicKey.toString();
+
+      // Save token to database
+      try {
+        await supabase.from("tokens").insert({
+          mint_address: mintAddr,
+          name: name.slice(0, 32),
+          symbol: symbol.slice(0, 10),
+          creator_wallet: walletAddress,
+          initial_price: 10000,
+          total_supply: 1_000_000_000,
+          metadata_uri: metadataUri,
+          audio_clip_id: preloadedClipId || null,
+        });
+      } catch (dbError) {
+        console.error("Error saving token to database:", dbError);
+      }
+
+      // Update mint_token task progress
+      const taskCompleted = await updateTaskProgress(walletAddress, "mint_token", 1);
+      if (taskCompleted) {
+        toast.success("Quest completed: Mint 1 token! 🎉");
+      }
+
+      setMintAddress(mintAddr);
       setSuccess(true);
       toast.success("Token created successfully!");
     } catch (error: any) {

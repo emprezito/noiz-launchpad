@@ -21,6 +21,8 @@ import {
   calculateSellReturn,
   getBondingCurvePDA 
 } from "@/lib/solana/program";
+import { updateTradingVolume } from "@/lib/taskUtils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TokenInfo {
   name: string;
@@ -247,6 +249,28 @@ const TradePage = () => {
       const transaction = await buyTokens(connection, publicKey, mintPubkey, tokenAmount);
       const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(signature, "confirmed");
+      
+      const solAmount = parseFloat(buyAmount);
+      const usdVolume = solAmount * (solUsdPrice || 0);
+      const walletAddress = publicKey.toString();
+
+      // Record trade in database
+      try {
+        await supabase.from("trade_history").insert({
+          wallet_address: walletAddress,
+          mint_address: activeMint,
+          trade_type: "buy",
+          amount: Number(tokenAmount),
+          price_lamports: Math.floor(solAmount * 1e9),
+          signature,
+        });
+      } catch (dbError) {
+        console.error("Error saving trade:", dbError);
+      }
+
+      // Update trading tasks
+      await updateTradingVolume(walletAddress, usdVolume);
+      
       toast.success(`Bought tokens! TX: ${signature.slice(0, 8)}...`);
       setBuyAmount("");
       loadTokenInfo();
@@ -267,6 +291,28 @@ const TradePage = () => {
       const transaction = await sellTokens(connection, publicKey, mintPubkey, tokenAmount);
       const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(signature, "confirmed");
+      
+      const solReceived = parseFloat(sellAmount) * tokenInfo.price;
+      const usdVolume = solReceived * (solUsdPrice || 0);
+      const walletAddress = publicKey.toString();
+
+      // Record trade in database
+      try {
+        await supabase.from("trade_history").insert({
+          wallet_address: walletAddress,
+          mint_address: activeMint,
+          trade_type: "sell",
+          amount: Number(tokenAmount),
+          price_lamports: Math.floor(solReceived * 1e9),
+          signature,
+        });
+      } catch (dbError) {
+        console.error("Error saving trade:", dbError);
+      }
+
+      // Update trading tasks
+      await updateTradingVolume(walletAddress, usdVolume);
+      
       toast.success(`Sold tokens! TX: ${signature.slice(0, 8)}...`);
       setSellAmount("");
       loadTokenInfo();
