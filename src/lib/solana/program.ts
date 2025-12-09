@@ -104,7 +104,7 @@ export async function createAudioTokenWithCurve(
 
   const tx = await program.methods
     .createAudioTokenWithCurve(
-      params.name.slice(0, 50),
+      params.name.slice(0, 32),  // Rust validates max 32 chars
       params.symbol.slice(0, 10),
       params.metadataUri.slice(0, 200),
       new BN(params.totalSupply.toString()),
