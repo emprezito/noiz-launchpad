@@ -1,22 +1,55 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-// All tasks are now daily
-const TASK_DEFINITIONS = [
-  { task_type: "interact_clips", target: 20, points_reward: 50, reset_period: "daily", label: "Interact with 20 audio clips" },
-  { task_type: "upload_clips", target: 2, points_reward: 100, reset_period: "daily", label: "Upload 2 clips" },
-  { task_type: "mint_token", target: 1, points_reward: 200, reset_period: "daily", label: "Mint 1 token" },
-  { task_type: "trading_500", target: 500, points_reward: 300, reset_period: "daily", label: "Complete $500 trading volume" },
-  { task_type: "trading_1000", target: 1000, points_reward: 500, reset_period: "daily", label: "Complete $1000 trading volume" },
-  { task_type: "trading_2000", target: 2000, points_reward: 1000, reset_period: "daily", label: "Complete $2000 trading volume" },
-  { task_type: "trade_5_tokens", target: 5, points_reward: 150, reset_period: "daily", label: "Trade 5 tokens" },
-];
+interface QuestDefinition {
+  id: string;
+  task_type: string;
+  display_name: string;
+  description: string | null;
+  target: number;
+  points_reward: number;
+  reset_period: string;
+  icon: string;
+  is_active: boolean;
+}
+
+// Cache for quest definitions
+let questDefinitionsCache: QuestDefinition[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 60000; // 1 minute
+
+/**
+ * Fetch quest definitions from database
+ */
+export const fetchQuestDefinitions = async (): Promise<QuestDefinition[]> => {
+  const now = Date.now();
+  
+  // Return cached data if still valid
+  if (questDefinitionsCache && (now - cacheTimestamp) < CACHE_DURATION) {
+    return questDefinitionsCache;
+  }
+
+  const { data, error } = await supabase
+    .from("quest_definitions")
+    .select("*")
+    .eq("is_active", true);
+
+  if (error) {
+    console.error("Error fetching quest definitions:", error);
+    return questDefinitionsCache || [];
+  }
+
+  questDefinitionsCache = data as QuestDefinition[];
+  cacheTimestamp = now;
+  return questDefinitionsCache;
+};
 
 /**
  * Get task definition by type
  */
-const getTaskDefinition = (taskType: string) => {
-  return TASK_DEFINITIONS.find(def => def.task_type === taskType);
+const getTaskDefinition = async (taskType: string): Promise<QuestDefinition | undefined> => {
+  const definitions = await fetchQuestDefinitions();
+  return definitions.find(def => def.task_type === taskType);
 };
 
 /**
@@ -101,9 +134,9 @@ export const updateTaskProgress = async (
 
       // Auto-claim if task just completed
       if (completed) {
-        const taskDef = getTaskDefinition(taskType);
+        const taskDef = await getTaskDefinition(taskType);
         if (taskDef) {
-          await autoClaimPoints(walletAddress, task.id, task.points_reward, taskDef.label);
+          await autoClaimPoints(walletAddress, task.id, task.points_reward, taskDef.display_name);
         }
       }
 
@@ -125,13 +158,20 @@ export const updateTradingVolume = async (
   volumeUsd: number
 ): Promise<void> => {
   try {
-    // Update all trading volume tasks
-    await updateTaskProgress(walletAddress, "trading_500", volumeUsd);
-    await updateTaskProgress(walletAddress, "trading_1000", volumeUsd);
-    await updateTaskProgress(walletAddress, "trading_2000", volumeUsd);
-    
-    // Update trade count task
-    await updateTaskProgress(walletAddress, "trade_5_tokens", 1);
+    // Get all active trading volume tasks from DB
+    const definitions = await fetchQuestDefinitions();
+    const tradingTasks = definitions.filter(def => 
+      def.task_type.includes("trade") || def.task_type.includes("trading")
+    );
+
+    // Update each trading task
+    for (const task of tradingTasks) {
+      if (task.task_type.includes("volume")) {
+        await updateTaskProgress(walletAddress, task.task_type, volumeUsd);
+      } else {
+        await updateTaskProgress(walletAddress, task.task_type, 1);
+      }
+    }
     
     console.log(`Trading volume updated: $${volumeUsd} for ${walletAddress}`);
   } catch (error) {
@@ -145,6 +185,9 @@ export const updateTradingVolume = async (
  */
 export const ensureUserTasks = async (walletAddress: string): Promise<void> => {
   try {
+    // Fetch current quest definitions from database
+    const questDefinitions = await fetchQuestDefinitions();
+    
     // Check if user has tasks
     const { data: existingTasks } = await supabase
       .from("user_tasks")
@@ -153,8 +196,8 @@ export const ensureUserTasks = async (walletAddress: string): Promise<void> => {
 
     const existingTypes = new Set((existingTasks || []).map(t => t.task_type));
     
-    // Create missing tasks (all daily now)
-    const missingTasks = TASK_DEFINITIONS
+    // Create missing tasks based on database definitions
+    const missingTasks = questDefinitions
       .filter(def => !existingTypes.has(def.task_type))
       .map(def => ({
         wallet_address: walletAddress,
@@ -163,7 +206,7 @@ export const ensureUserTasks = async (walletAddress: string): Promise<void> => {
         target: def.target,
         points_reward: def.points_reward,
         completed: false,
-        reset_period: "daily",
+        reset_period: def.reset_period,
       }));
 
     if (missingTasks.length > 0) {
@@ -205,5 +248,3 @@ export const ensureUserTasks = async (walletAddress: string): Promise<void> => {
     console.error("Error ensuring user tasks:", error);
   }
 };
-
-export { TASK_DEFINITIONS };
