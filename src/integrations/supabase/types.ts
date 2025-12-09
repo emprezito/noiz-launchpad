@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_wallets: {
+        Row: {
+          created_at: string | null
+          id: string
+          wallet_address: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          wallet_address: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
       audio_clips: {
         Row: {
           audio_url: string
@@ -50,6 +68,48 @@ export type Database = {
           shares?: number | null
           title?: string
           wallet_address?: string | null
+        }
+        Relationships: []
+      }
+      quest_definitions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_name: string
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          points_reward: number
+          reset_period: string
+          target: number
+          task_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          points_reward?: number
+          reset_period?: string
+          target?: number
+          task_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          points_reward?: number
+          reset_period?: string
+          target?: number
+          task_type?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
