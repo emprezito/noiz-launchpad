@@ -118,7 +118,7 @@ const CreatePage = () => {
       const mintKeypair = Keypair.generate();
 
       const params: CreateAudioTokenParams = {
-        name: name.slice(0, 50),
+        name: name.slice(0, 32),  // Rust validates max 32 chars
         symbol: symbol.slice(0, 10),
         metadataUri: metadataUri.slice(0, 200),
         totalSupply: BigInt(1_000_000_000 * 1e9),
@@ -377,7 +377,7 @@ const CreatePage = () => {
                       placeholder="Bruh Sound Effect"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      maxLength={50}
+                      maxLength={32}
                       className="mt-2"
                     />
                   </div>
