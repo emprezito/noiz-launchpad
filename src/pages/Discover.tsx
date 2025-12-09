@@ -57,8 +57,12 @@ const DiscoverPage = () => {
 
   useEffect(() => {
     fetchClips();
+  }, []);
 
-    // Subscribe to real-time updates for audio_clips
+  // Real-time subscription with notifications
+  useEffect(() => {
+    const walletAddress = publicKey?.toString();
+
     const channel = supabase
       .channel('discover-clips-changes')
       .on(
@@ -72,7 +76,6 @@ const DiscoverPage = () => {
           console.log('Real-time clip update:', payload);
           
           if (payload.eventType === 'INSERT') {
-            // Add new clip to the beginning
             const newClip = payload.new as any;
             const mappedClip: AudioClip = {
               id: newClip.id,
@@ -88,8 +91,26 @@ const DiscoverPage = () => {
             };
             setClips(prev => [mappedClip, ...prev.filter(c => c.id !== newClip.id)]);
           } else if (payload.eventType === 'UPDATE') {
-            // Update existing clip
             const updated = payload.new as any;
+            const old = payload.old as any;
+            
+            // Check if this is the current user's clip and someone else engaged
+            if (walletAddress && updated.wallet_address === walletAddress) {
+              const likeDiff = (updated.likes || 0) - (old.likes || 0);
+              const playDiff = (updated.plays || 0) - (old.plays || 0);
+              const shareDiff = (updated.shares || 0) - (old.shares || 0);
+              
+              if (likeDiff > 0) {
+                toast.success(`Someone liked your clip "${updated.title}"! ❤️`);
+              }
+              if (playDiff > 0) {
+                toast.info(`Someone is playing your clip "${updated.title}"! 🎧`);
+              }
+              if (shareDiff > 0) {
+                toast.success(`Someone shared your clip "${updated.title}"! 🔗`);
+              }
+            }
+            
             setClips(prev => prev.map(clip => 
               clip.id === updated.id 
                 ? { 
@@ -101,7 +122,6 @@ const DiscoverPage = () => {
                 : clip
             ));
           } else if (payload.eventType === 'DELETE') {
-            // Remove deleted clip
             const deleted = payload.old as any;
             setClips(prev => prev.filter(clip => clip.id !== deleted.id));
           }
@@ -112,7 +132,7 @@ const DiscoverPage = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [publicKey]);
 
   useEffect(() => {
     filterClips();
