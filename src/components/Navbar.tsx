@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Droplets, Loader2, Wallet } from "lucide-react";
+import { Menu, X, Droplets, Loader2, Wallet, Shield } from "lucide-react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import WalletButton from "./WalletButton";
@@ -8,6 +8,7 @@ import { useSolPrice } from "@/hooks/useSolPrice";
 import { useWalletBalance } from "@/hooks/useWalletBalance";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const navigation = [
   { name: "Home", href: "/" },
@@ -22,11 +23,29 @@ const navigation = [
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [requestingAirdrop, setRequestingAirdrop] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const location = useLocation();
   const { price, loading } = useSolPrice();
   const { connection } = useConnection();
   const { publicKey, connected } = useWallet();
   const { balance, loading: balanceLoading } = useWalletBalance();
+
+  // Check if wallet is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!publicKey) {
+        setIsAdmin(false);
+        return;
+      }
+      const { data } = await supabase
+        .from("admin_wallets")
+        .select("id")
+        .eq("wallet_address", publicKey.toBase58())
+        .maybeSingle();
+      setIsAdmin(!!data);
+    };
+    checkAdmin();
+  }, [publicKey]);
 
   const requestAirdrop = async () => {
     if (!publicKey) {
@@ -83,6 +102,19 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
+                  isActive("/admin")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                Admin
+              </Link>
+            )}
           </div>
 
           {/* SOL Price & Connect Wallet */}
@@ -168,6 +200,20 @@ const Navbar = () => {
                   {item.name}
                 </Link>
               ))}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-4 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                    isActive("/admin")
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  Admin Panel
+                </Link>
+              )}
               {/* Mobile Balance & Faucet */}
               {connected && (
                 <div className="space-y-2">
