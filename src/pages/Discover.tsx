@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Play, Pause, Heart, Share2, Coins, Plus, Upload, Loader2, Trophy } from "lucide-react";
+import { updateTaskProgress, ensureUserTasks } from "@/lib/taskUtils";
 
 interface AudioClip {
   id: string;
@@ -58,6 +59,13 @@ const DiscoverPage = () => {
   useEffect(() => {
     fetchClips();
   }, []);
+
+  // Initialize user tasks when wallet connects
+  useEffect(() => {
+    if (publicKey) {
+      ensureUserTasks(publicKey.toString());
+    }
+  }, [publicKey]);
 
   // Real-time subscription with notifications
   useEffect(() => {
@@ -251,28 +259,7 @@ const DiscoverPage = () => {
     }
   };
 
-  const updateTaskProgress = async (walletAddress: string, taskType: string, increment: number) => {
-    try {
-      const { data: task } = await supabase
-        .from("user_tasks")
-        .select("*")
-        .eq("wallet_address", walletAddress)
-        .eq("task_type", taskType)
-        .maybeSingle();
-
-      if (task) {
-        const newProgress = (task.progress || 0) + increment;
-        const completed = newProgress >= task.target;
-
-        await supabase
-          .from("user_tasks")
-          .update({ progress: newProgress, completed })
-          .eq("id", task.id);
-      }
-    } catch (error) {
-      console.error("Error updating task:", error);
-    }
-  };
+  // Task progress is now handled by shared utility from @/lib/taskUtils
 
   const handleLike = async (clipId: string) => {
     const clip = clips.find((c) => c.id === clipId);
