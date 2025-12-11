@@ -12,121 +12,140 @@ export const BONDING_CURVE_SEED = TOKEN_CONFIG_SEED;
 // Platform fee account - receives 0.25% trading fees
 export const PLATFORM_FEE_ACCOUNT = "GVHjPM3DfTnSFLMx72RcCCAViqWWsJ6ENKXRq7nWedEp";
 
-// Full IDL JSON from the deployed program
+// Full IDL JSON from the deployed program - Anchor 0.30.1 format without discriminators
+// Let the SDK compute discriminators to avoid mismatches
 export const IDL = {
+  "version": "0.1.0",
+  "name": "audio_token_platform",
   "address": "9m8ApaLxscUk6VhsuN12imf6ZvuCqPt42uDJMA1eRe7Y",
-  "metadata": {
-    "name": "audio_token_platform",
-    "version": "0.1.0",
-    "spec": "0.1.0"
-  },
   "instructions": [
     {
-      "name": "create_audio_token",
-      "docs": ["Create audio token with bonding curve and Metaplex metadata"],
-      "discriminator": [166, 116, 242, 47, 197, 111, 202, 240],
+      "name": "createAudioToken",
       "accounts": [
-        { "name": "token_config", "writable": true },
-        { "name": "lp_account", "writable": true },
-        { "name": "mint", "writable": true, "signer": true },
-        { "name": "reserve_token_account", "writable": true },
-        { "name": "metadata_account", "writable": true },
-        { "name": "creator", "writable": true, "signer": true },
-        { "name": "token_metadata_program" },
-        { "name": "platform_fee_account", "writable": true },
-        { "name": "system_program" },
-        { "name": "token_program" },
-        { "name": "associated_token_program" },
-        { "name": "rent" }
+        { "name": "tokenConfig", "isMut": true, "isSigner": false },
+        { "name": "lpAccount", "isMut": true, "isSigner": false },
+        { "name": "mint", "isMut": true, "isSigner": true },
+        { "name": "reserveTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "metadataAccount", "isMut": true, "isSigner": false },
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "tokenMetadataProgram", "isMut": false, "isSigner": false },
+        { "name": "platformFeeAccount", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false },
+        { "name": "associatedTokenProgram", "isMut": false, "isSigner": false },
+        { "name": "rent", "isMut": false, "isSigner": false }
       ],
       "args": [
         { "name": "name", "type": "string" },
         { "name": "symbol", "type": "string" },
-        { "name": "metadata_uri", "type": "string" },
-        { "name": "total_supply", "type": "u64" }
+        { "name": "metadataUri", "type": "string" },
+        { "name": "totalSupply", "type": "u64" }
       ]
     },
     {
-      "name": "buy_tokens",
-      "docs": ["Buy tokens from the bonding curve (AMM-style)"],
-      "discriminator": [189, 21, 230, 133, 247, 2, 110, 42],
+      "name": "buyTokens",
       "accounts": [
-        { "name": "token_config", "writable": true },
-        { "name": "mint", "writable": true },
-        { "name": "reserve_token_account", "writable": true },
-        { "name": "buyer_token_account", "writable": true },
-        { "name": "buyer", "writable": true, "signer": true },
-        { "name": "platform_fee_account", "writable": true },
-        { "name": "system_program" },
-        { "name": "token_program" },
-        { "name": "associated_token_program" }
+        { "name": "tokenConfig", "isMut": true, "isSigner": false },
+        { "name": "mint", "isMut": true, "isSigner": false },
+        { "name": "reserveTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "buyerTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "buyer", "isMut": true, "isSigner": true },
+        { "name": "platformFeeAccount", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false },
+        { "name": "associatedTokenProgram", "isMut": false, "isSigner": false }
       ],
       "args": [
-        { "name": "sol_amount", "type": "u64" },
-        { "name": "min_tokens_out", "type": "u64" }
+        { "name": "solAmount", "type": "u64" },
+        { "name": "minTokensOut", "type": "u64" }
       ]
     },
     {
-      "name": "sell_tokens",
-      "docs": ["Sell tokens back to bonding curve"],
-      "discriminator": [114, 242, 25, 12, 62, 126, 92, 2],
+      "name": "sellTokens",
       "accounts": [
-        { "name": "token_config", "writable": true },
-        { "name": "lp_account" },
-        { "name": "mint", "writable": true },
-        { "name": "reserve_token_account", "writable": true },
-        { "name": "seller_token_account", "writable": true },
-        { "name": "seller", "writable": true, "signer": true },
-        { "name": "platform_fee_account", "writable": true },
-        { "name": "token_program" }
+        { "name": "tokenConfig", "isMut": true, "isSigner": false },
+        { "name": "lpAccount", "isMut": false, "isSigner": false },
+        { "name": "mint", "isMut": true, "isSigner": false },
+        { "name": "reserveTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "sellerTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "seller", "isMut": true, "isSigner": true },
+        { "name": "platformFeeAccount", "isMut": true, "isSigner": false },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false }
       ],
       "args": [
-        { "name": "token_amount", "type": "u64" },
-        { "name": "min_sol_out", "type": "u64" }
+        { "name": "tokenAmount", "type": "u64" },
+        { "name": "minSolOut", "type": "u64" }
       ]
     },
     {
-      "name": "add_liquidity",
-      "docs": ["Add liquidity to an existing token"],
-      "discriminator": [181, 157, 89, 67, 143, 182, 52, 72],
+      "name": "addLiquidity",
       "accounts": [
-        { "name": "token_config", "writable": true },
-        { "name": "lp_account", "writable": true },
-        { "name": "mint", "writable": true },
-        { "name": "reserve_token_account", "writable": true },
-        { "name": "provider_token_account", "writable": true },
-        { "name": "lp_provider", "writable": true, "signer": true },
-        { "name": "token_program" },
-        { "name": "system_program" }
+        { "name": "tokenConfig", "isMut": true, "isSigner": false },
+        { "name": "lpAccount", "isMut": true, "isSigner": false },
+        { "name": "mint", "isMut": true, "isSigner": false },
+        { "name": "reserveTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "providerTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "lpProvider", "isMut": true, "isSigner": true },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
       ],
       "args": [
-        { "name": "sol_amount", "type": "u64" },
-        { "name": "token_amount", "type": "u64" }
+        { "name": "solAmount", "type": "u64" },
+        { "name": "tokenAmount", "type": "u64" }
       ]
     },
     {
-      "name": "remove_liquidity",
-      "docs": ["Remove liquidity from an existing token"],
-      "discriminator": [80, 85, 209, 72, 24, 206, 177, 108],
+      "name": "removeLiquidity",
       "accounts": [
-        { "name": "token_config", "writable": true },
-        { "name": "lp_account", "writable": true },
-        { "name": "mint", "writable": true },
-        { "name": "reserve_token_account", "writable": true },
-        { "name": "provider_token_account", "writable": true },
-        { "name": "lp_provider", "writable": true, "signer": true },
-        { "name": "token_program" },
-        { "name": "associated_token_program" },
-        { "name": "system_program" }
+        { "name": "tokenConfig", "isMut": true, "isSigner": false },
+        { "name": "lpAccount", "isMut": true, "isSigner": false },
+        { "name": "mint", "isMut": true, "isSigner": false },
+        { "name": "reserveTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "providerTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "lpProvider", "isMut": true, "isSigner": true },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false },
+        { "name": "associatedTokenProgram", "isMut": false, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
       ],
       "args": [
-        { "name": "lp_share", "type": "u64" }
+        { "name": "lpShare", "type": "u64" }
       ]
     }
   ],
   "accounts": [
-    { "name": "TokenConfig", "discriminator": [147, 160, 81, 85, 44, 209, 94, 37] },
-    { "name": "LpAccount", "discriminator": [23, 183, 248, 55, 96, 216, 172, 96] }
+    { 
+      "name": "TokenConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "mint", "type": "publicKey" },
+          { "name": "creator", "type": "publicKey" },
+          { "name": "name", "type": "string" },
+          { "name": "symbol", "type": "string" },
+          { "name": "metadataUri", "type": "string" },
+          { "name": "totalSupply", "type": "u64" },
+          { "name": "initialSupply", "type": "u64" },
+          { "name": "solReserves", "type": "u64" },
+          { "name": "tokenReserves", "type": "u64" },
+          { "name": "tokensSold", "type": "u64" },
+          { "name": "totalVolume", "type": "u64" },
+          { "name": "createdAt", "type": "i64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    { 
+      "name": "LpAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "mint", "type": "publicKey" },
+          { "name": "liquidity", "type": "u64" },
+          { "name": "timestamp", "type": "i64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
   ],
   "errors": [
     { "code": 6000, "name": "InvalidAmount", "msg": "Invalid amount" },
@@ -135,41 +154,6 @@ export const IDL = {
     { "code": 6003, "name": "InsufficientLiquidity", "msg": "Insufficient liquidity" },
     { "code": 6004, "name": "SlippageExceeded", "msg": "Slippage exceeded" },
     { "code": 6005, "name": "InvalidPriceRatio", "msg": "Invalid price ratio" }
-  ],
-  "types": [
-    {
-      "name": "TokenConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          { "name": "mint", "type": "pubkey" },
-          { "name": "creator", "type": "pubkey" },
-          { "name": "name", "type": "string" },
-          { "name": "symbol", "type": "string" },
-          { "name": "metadata_uri", "type": "string" },
-          { "name": "total_supply", "type": "u64" },
-          { "name": "initial_supply", "type": "u64" },
-          { "name": "sol_reserves", "type": "u64" },
-          { "name": "token_reserves", "type": "u64" },
-          { "name": "tokens_sold", "type": "u64" },
-          { "name": "total_volume", "type": "u64" },
-          { "name": "created_at", "type": "i64" },
-          { "name": "bump", "type": "u8" }
-        ]
-      }
-    },
-    {
-      "name": "LpAccount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          { "name": "mint", "type": "pubkey" },
-          { "name": "liquidity", "type": "u64" },
-          { "name": "timestamp", "type": "i64" },
-          { "name": "bump", "type": "u8" }
-        ]
-      }
-    }
   ]
 } as const;
 

@@ -108,7 +108,7 @@ export async function createAudioToken(
     creator: creator.toString(),
   });
 
-  // Account names in camelCase for Anchor JS client
+  // Account names in camelCase to match classic Anchor IDL format
   const tx = await program.methods
     .createAudioToken(
       params.name.slice(0, 50),
