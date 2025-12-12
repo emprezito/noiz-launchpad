@@ -24,7 +24,7 @@ serve(async (req) => {
     console.log(`Running task reset at ${now.toISOString()}`);
     console.log(`Today start (UTC): ${todayStart.toISOString()}`);
 
-    // First, convert any remaining weekly tasks to daily
+    // Convert any remaining weekly tasks to daily (except one_time)
     const { data: convertedTasks, error: convertError } = await supabase
       .from('user_tasks')
       .update({ reset_period: 'daily' })
@@ -38,6 +38,7 @@ serve(async (req) => {
     }
 
     // Reset ALL daily tasks where last_reset is before today (UTC midnight)
+    // Skip one_time tasks - they should never reset
     const { data: resetTasks, error: resetError } = await supabase
       .from('user_tasks')
       .update({ 
@@ -52,7 +53,7 @@ serve(async (req) => {
     if (resetError) {
       console.error('Error resetting daily tasks:', resetError);
     } else {
-      console.log(`Reset ${resetTasks?.length || 0} daily tasks`);
+      console.log(`Reset ${resetTasks?.length || 0} daily tasks (skipped one_time tasks)`);
     }
 
     return new Response(

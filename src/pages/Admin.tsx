@@ -446,6 +446,7 @@ const Admin = () => {
                   <TableHead>Active</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Reset</TableHead>
                   <TableHead>Target</TableHead>
                   <TableHead>Reward</TableHead>
                   <TableHead>Social Link</TableHead>
@@ -463,6 +464,17 @@ const Admin = () => {
                     </TableCell>
                     <TableCell className="font-medium">{quest.display_name}</TableCell>
                     <TableCell className="text-muted-foreground font-mono text-sm">{quest.task_type}</TableCell>
+                    <TableCell>
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        quest.reset_period === 'one_time' 
+                          ? 'bg-primary/20 text-primary' 
+                          : quest.reset_period === 'weekly'
+                            ? 'bg-secondary/50 text-secondary-foreground'
+                            : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {quest.reset_period === 'one_time' ? 'One Time' : quest.reset_period}
+                      </span>
+                    </TableCell>
                     <TableCell>{quest.target}</TableCell>
                     <TableCell>{quest.points_reward} pts</TableCell>
                     <TableCell>
