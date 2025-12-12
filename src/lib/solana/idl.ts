@@ -24,100 +24,100 @@ export const IDL = {
   },
   "instructions": [
     {
-      "name": "createAudioToken",
+      "name": "create_audio_token",
       "discriminator": [0, 0, 0, 0, 0, 0, 0, 0],
       "accounts": [
-        { "name": "tokenConfig", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [116, 111, 107, 101, 110, 95, 99, 111, 110, 102, 105, 103] }, { "kind": "account", "path": "mint" }] } },
-        { "name": "lpAccount", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [108, 112, 95, 97, 99, 99, 111, 117, 110, 116] }, { "kind": "account", "path": "mint" }] } },
+        { "name": "token_config", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [116, 111, 107, 101, 110, 95, 99, 111, 110, 102, 105, 103] }, { "kind": "account", "path": "mint" }] } },
+        { "name": "lp_account", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [108, 112, 95, 97, 99, 99, 111, 117, 110, 116] }, { "kind": "account", "path": "mint" }] } },
         { "name": "mint", "writable": true, "signer": true },
-        { "name": "reserveTokenAccount", "writable": true },
-        { "name": "metadataAccount", "writable": true },
+        { "name": "reserve_token_account", "writable": true },
+        { "name": "metadata_account", "writable": true },
         { "name": "creator", "writable": true, "signer": true },
-        { "name": "tokenMetadataProgram" },
-        { "name": "platformFeeAccount", "writable": true },
-        { "name": "systemProgram" },
-        { "name": "tokenProgram" },
-        { "name": "associatedTokenProgram" },
+        { "name": "token_metadata_program" },
+        { "name": "platform_fee_account", "writable": true },
+        { "name": "system_program" },
+        { "name": "token_program" },
+        { "name": "associated_token_program" },
         { "name": "rent" }
       ],
       "args": [
         { "name": "name", "type": "string" },
         { "name": "symbol", "type": "string" },
-        { "name": "metadataUri", "type": "string" },
-        { "name": "totalSupply", "type": "u64" }
+        { "name": "metadata_uri", "type": "string" },
+        { "name": "total_supply", "type": "u64" }
       ]
     },
     {
-      "name": "buyTokens",
+      "name": "buy_tokens",
       "discriminator": [0, 0, 0, 0, 0, 0, 0, 1],
       "accounts": [
-        { "name": "tokenConfig", "writable": true },
+        { "name": "token_config", "writable": true },
         { "name": "mint", "writable": true },
-        { "name": "reserveTokenAccount", "writable": true },
-        { "name": "buyerTokenAccount", "writable": true },
+        { "name": "reserve_token_account", "writable": true },
+        { "name": "buyer_token_account", "writable": true },
         { "name": "buyer", "writable": true, "signer": true },
-        { "name": "platformFeeAccount", "writable": true },
-        { "name": "systemProgram" },
-        { "name": "tokenProgram" },
-        { "name": "associatedTokenProgram" }
+        { "name": "platform_fee_account", "writable": true },
+        { "name": "system_program" },
+        { "name": "token_program" },
+        { "name": "associated_token_program" }
       ],
       "args": [
-        { "name": "solAmount", "type": "u64" },
-        { "name": "minTokensOut", "type": "u64" }
+        { "name": "sol_amount", "type": "u64" },
+        { "name": "min_tokens_out", "type": "u64" }
       ]
     },
     {
-      "name": "sellTokens",
+      "name": "sell_tokens",
       "discriminator": [0, 0, 0, 0, 0, 0, 0, 2],
       "accounts": [
-        { "name": "tokenConfig", "writable": true },
-        { "name": "lpAccount" },
+        { "name": "token_config", "writable": true },
+        { "name": "lp_account" },
         { "name": "mint", "writable": true },
-        { "name": "reserveTokenAccount", "writable": true },
-        { "name": "sellerTokenAccount", "writable": true },
+        { "name": "reserve_token_account", "writable": true },
+        { "name": "seller_token_account", "writable": true },
         { "name": "seller", "writable": true, "signer": true },
-        { "name": "platformFeeAccount", "writable": true },
-        { "name": "tokenProgram" }
+        { "name": "platform_fee_account", "writable": true },
+        { "name": "token_program" }
       ],
       "args": [
-        { "name": "tokenAmount", "type": "u64" },
-        { "name": "minSolOut", "type": "u64" }
+        { "name": "token_amount", "type": "u64" },
+        { "name": "min_sol_out", "type": "u64" }
       ]
     },
     {
-      "name": "addLiquidity",
+      "name": "add_liquidity",
       "discriminator": [0, 0, 0, 0, 0, 0, 0, 3],
       "accounts": [
-        { "name": "tokenConfig", "writable": true },
-        { "name": "lpAccount", "writable": true },
+        { "name": "token_config", "writable": true },
+        { "name": "lp_account", "writable": true },
         { "name": "mint", "writable": true },
-        { "name": "reserveTokenAccount", "writable": true },
-        { "name": "providerTokenAccount", "writable": true },
-        { "name": "lpProvider", "writable": true, "signer": true },
-        { "name": "tokenProgram" },
-        { "name": "systemProgram" }
+        { "name": "reserve_token_account", "writable": true },
+        { "name": "provider_token_account", "writable": true },
+        { "name": "lp_provider", "writable": true, "signer": true },
+        { "name": "token_program" },
+        { "name": "system_program" }
       ],
       "args": [
-        { "name": "solAmount", "type": "u64" },
-        { "name": "tokenAmount", "type": "u64" }
+        { "name": "sol_amount", "type": "u64" },
+        { "name": "token_amount", "type": "u64" }
       ]
     },
     {
-      "name": "removeLiquidity",
+      "name": "remove_liquidity",
       "discriminator": [0, 0, 0, 0, 0, 0, 0, 4],
       "accounts": [
-        { "name": "tokenConfig", "writable": true },
-        { "name": "lpAccount", "writable": true },
+        { "name": "token_config", "writable": true },
+        { "name": "lp_account", "writable": true },
         { "name": "mint", "writable": true },
-        { "name": "reserveTokenAccount", "writable": true },
-        { "name": "providerTokenAccount", "writable": true },
-        { "name": "lpProvider", "writable": true, "signer": true },
-        { "name": "tokenProgram" },
-        { "name": "associatedTokenProgram" },
-        { "name": "systemProgram" }
+        { "name": "reserve_token_account", "writable": true },
+        { "name": "provider_token_account", "writable": true },
+        { "name": "lp_provider", "writable": true, "signer": true },
+        { "name": "token_program" },
+        { "name": "associated_token_program" },
+        { "name": "system_program" }
       ],
       "args": [
-        { "name": "lpShare", "type": "u64" }
+        { "name": "lp_share", "type": "u64" }
       ]
     }
   ],
