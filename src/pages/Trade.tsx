@@ -218,14 +218,15 @@ const TradePage = () => {
     try {
       const solAmountNum = parseFloat(buyAmount);
       const walletAddress = publicKey.toString();
+      const amountLamports = Math.floor(solAmountNum * 1e9); // Convert SOL to lamports
 
       // Call edge function for trade execution
       const { data, error } = await supabase.functions.invoke("execute-trade", {
         body: {
-          mint_address: activeMint,
-          trade_type: "buy",
-          sol_amount: solAmountNum,
-          wallet_address: walletAddress,
+          mintAddress: activeMint,
+          tradeType: "buy",
+          amount: amountLamports,
+          walletAddress: walletAddress,
         },
       });
 
@@ -235,7 +236,7 @@ const TradePage = () => {
       const usdVolume = solAmountNum * (solUsdPrice || 0);
       await updateTradingVolume(walletAddress, usdVolume);
       
-      toast.success(`Bought ${data.tokens_received?.toLocaleString() || ""} tokens!`);
+      toast.success(`Bought ${data.tokensOut?.toLocaleString() || ""} tokens!`);
       setBuyAmount("");
       loadTokenInfo();
     } catch (error: any) {
@@ -252,21 +253,22 @@ const TradePage = () => {
     try {
       const tokenAmountNum = parseFloat(sellAmount);
       const walletAddress = publicKey.toString();
+      const tokenAmountUnits = Math.floor(tokenAmountNum * 1e9); // Convert to smallest units
 
       // Call edge function for trade execution
       const { data, error } = await supabase.functions.invoke("execute-trade", {
         body: {
-          mint_address: activeMint,
-          trade_type: "sell",
-          token_amount: tokenAmountNum,
-          wallet_address: walletAddress,
+          mintAddress: activeMint,
+          tradeType: "sell",
+          amount: tokenAmountUnits,
+          walletAddress: walletAddress,
         },
       });
 
       if (error) throw new Error(error.message);
       if (!data.success) throw new Error(data.error || "Trade failed");
 
-      const solReceived = data.sol_received || 0;
+      const solReceived = (data.solOut || 0) / 1e9; // Convert lamports to SOL
       const usdVolume = solReceived * (solUsdPrice || 0);
       await updateTradingVolume(walletAddress, usdVolume);
       
