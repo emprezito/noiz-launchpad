@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -85,11 +86,46 @@ const TradePage = () => {
   const [loading, setLoading] = useState(false);
   const [trading, setTrading] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
-  const [userBalance, setUserBalance] = useState("0");
+  const [userBalance, setUserBalance] = useState<number>(0);
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [chartData, setChartData] = useState(generateChartData());
   const [transactions] = useState<TradeTransaction[]>(DEMO_TRANSACTIONS);
   const [isLive, setIsLive] = useState(false);
+
+  // Fetch user's token balance
+  const fetchUserBalance = useCallback(async () => {
+    if (!publicKey || !activeMint) {
+      setUserBalance(0);
+      return;
+    }
+
+    try {
+      setBalanceLoading(true);
+      const mintPubkey = new PublicKey(activeMint);
+      const ata = await getAssociatedTokenAddress(mintPubkey, publicKey);
+      
+      try {
+        const accountInfo = await getAccount(connection, ata);
+        // Convert from smallest unit (9 decimals) to display format
+        const balance = Number(accountInfo.amount) / 1e9;
+        setUserBalance(balance);
+      } catch {
+        // Account doesn't exist = 0 balance
+        setUserBalance(0);
+      }
+    } catch (error) {
+      console.error("Error fetching balance:", error);
+      setUserBalance(0);
+    } finally {
+      setBalanceLoading(false);
+    }
+  }, [publicKey, activeMint, connection]);
+
+  // Fetch balance when mint or wallet changes
+  useEffect(() => {
+    fetchUserBalance();
+  }, [fetchUserBalance]);
 
   // Set up real-time subscription for token data from Supabase
   useEffect(() => {
@@ -183,7 +219,7 @@ const TradePage = () => {
         toast.error("Token not found in database");
         setTokenInfo(null);
       }
-      setUserBalance("0"); // TODO: Fetch actual user balance
+      // Balance will be fetched by the fetchUserBalance effect
     } catch (error) {
       console.error("Error loading token:", error);
       toast.error("Failed to load token data");
@@ -239,6 +275,7 @@ const TradePage = () => {
       toast.success(`Bought ${data.tokensOut?.toLocaleString() || ""} tokens!`);
       setBuyAmount("");
       loadTokenInfo();
+      fetchUserBalance();
     } catch (error: any) {
       toast.error(error.message || "Transaction failed");
     }
@@ -275,6 +312,7 @@ const TradePage = () => {
       toast.success(`Sold for ${solReceived.toFixed(4)} SOL!`);
       setSellAmount("");
       loadTokenInfo();
+      fetchUserBalance();
     } catch (error: any) {
       toast.error(error.message || "Transaction failed");
     }
@@ -345,7 +383,12 @@ const TradePage = () => {
                           <p className="text-muted-foreground">Market Cap</p>
                           <p className="font-bold">{formatUsd(tokenInfo.solReserves * 2)}</p>
                         </div>
-                        <div><p className="text-muted-foreground">Your Balance</p><p className="font-bold">{parseInt(userBalance).toLocaleString()}</p></div>
+                        <div>
+                          <p className="text-muted-foreground">Your Balance</p>
+                          <p className="font-bold">
+                            {balanceLoading ? "..." : userBalance.toLocaleString()} {tokenInfo.symbol}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
