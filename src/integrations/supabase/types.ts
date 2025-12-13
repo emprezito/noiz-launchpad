@@ -127,11 +127,16 @@ export type Database = {
           creator_wallet: string
           id: string
           initial_price: number
+          is_active: boolean | null
           metadata_uri: string | null
           mint_address: string
           name: string
+          sol_reserves: number | null
           symbol: string
+          token_reserves: number | null
+          tokens_sold: number | null
           total_supply: number
+          total_volume: number | null
         }
         Insert: {
           audio_clip_id?: string | null
@@ -140,11 +145,16 @@ export type Database = {
           creator_wallet: string
           id?: string
           initial_price: number
+          is_active?: boolean | null
           metadata_uri?: string | null
           mint_address: string
           name: string
+          sol_reserves?: number | null
           symbol: string
+          token_reserves?: number | null
+          tokens_sold?: number | null
           total_supply: number
+          total_volume?: number | null
         }
         Update: {
           audio_clip_id?: string | null
@@ -153,11 +163,16 @@ export type Database = {
           creator_wallet?: string
           id?: string
           initial_price?: number
+          is_active?: boolean | null
           metadata_uri?: string | null
           mint_address?: string
           name?: string
+          sol_reserves?: number | null
           symbol?: string
+          token_reserves?: number | null
+          tokens_sold?: number | null
           total_supply?: number
+          total_volume?: number | null
         }
         Relationships: [
           {

@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.devnet-faucet]
 verify_jwt = false
+
+[functions.upload-metadata-to-ipfs]
+verify_jwt = false
+
+[functions.manage-quests]
+verify_jwt = false
+
+[functions.execute-trade]
+verify_jwt = false

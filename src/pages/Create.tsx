@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Music, Image, Check, Loader2, AlertCircle, Shield, AlertTriangle } from "lucide-react";
-import { createAudioTokenWithCurve, CreateAudioTokenParams } from "@/lib/solana/program";
+import { createTokenWithMetaplex, CreateTokenParams } from "@/lib/solana/createToken";
 import { uploadTokenMetadata } from "@/lib/ipfsUpload";
 import { useSolPrice } from "@/hooks/useSolPrice";
 import { updateTaskProgress, ensureUserTasks } from "@/lib/taskUtils";
@@ -124,21 +124,17 @@ const CreatePage = () => {
       
       const metadataUri = uploadResult.url!;
       
-      // Validate metadata URI length (Solana program limits to 100 chars)
-      if (metadataUri.length > 100) {
-        throw new Error(`Metadata URI is too long (${metadataUri.length} chars). Maximum allowed is 100 characters. Please try with a shorter file name or contact support.`);
-      }
-      
+      // No length validation needed - Metaplex supports longer URIs
       const mintKeypair = Keypair.generate();
 
-      const params: CreateAudioTokenParams = {
-        name: name.slice(0, 32),  // Rust validates max 32 chars
+      const params: CreateTokenParams = {
+        name: name.slice(0, 32),
         symbol: symbol.slice(0, 10),
-        metadataUri: metadataUri,  // Already validated above
+        metadataUri: metadataUri.slice(0, 200),
         totalSupply: BigInt(1_000_000_000 * 1e9),
       };
 
-      console.log("Creating token with params:", {
+      console.log("Creating token with standard SPL Token + Metaplex:", {
         name: params.name,
         symbol: params.symbol,
         metadataUri: params.metadataUri,
@@ -147,16 +143,17 @@ const CreatePage = () => {
         creator: publicKey.toString(),
       });
 
-      const transaction = await createAudioTokenWithCurve(
+      toast.info("Creating token on Solana...");
+      
+      const transaction = await createTokenWithMetaplex(
         connection,
         publicKey,
         mintKeypair,
         params
       );
       
-      console.log("Transaction created with Anchor SDK");
-      console.log("Transaction instructions:", transaction.instructions);
-      console.log("Transaction signers needed:", transaction.signatures.map(s => s.publicKey?.toString()));
+      console.log("Transaction created with SPL Token + Metaplex");
+      console.log("Transaction instructions:", transaction.instructions.length);
 
       let signature: string;
       try {
@@ -206,7 +203,8 @@ const CreatePage = () => {
       const walletAddress = publicKey.toString();
       const mintAddr = mintKeypair.publicKey.toString();
 
-      // Save token to database
+      // Save token to database with bonding curve initialization
+      const initialTokenReserve = 100_000_000_000_000_000; // 10% of 1B tokens with 9 decimals
       try {
         await supabase.from("tokens").insert({
           mint_address: mintAddr,
@@ -217,7 +215,7 @@ const CreatePage = () => {
           total_supply: 1_000_000_000,
           metadata_uri: metadataUri,
           audio_clip_id: preloadedClipId || null,
-        });
+        } as any);
       } catch (dbError) {
         console.error("Error saving token to database:", dbError);
       }
