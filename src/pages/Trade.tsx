@@ -421,6 +421,7 @@ const TradePage = () => {
       const walletAddress = publicKey.toString();
 
       if (pendingTrade.type === "buy") {
+        // BUY: User sends SOL to platform wallet, platform sends tokens to user
         const amountLamports = Math.floor(pendingTrade.inputAmount * LAMPORTS_PER_SOL);
 
         const transaction = new Transaction();
@@ -439,6 +440,7 @@ const TradePage = () => {
         const signature = await sendTransaction(transaction, connection);
         await connection.confirmTransaction(signature, "confirmed");
 
+        // Edge function will transfer tokens from platform wallet to user
         const { data, error } = await supabase.functions.invoke("execute-trade", {
           body: {
             mintAddress: activeMint,
@@ -455,36 +457,40 @@ const TradePage = () => {
         const usdVolume = pendingTrade.inputAmount * (solUsdPrice || 0);
         await updateTradingVolume(walletAddress, usdVolume);
         
-        toast.success(`Bought ${data.tokensOut?.toLocaleString() || ""} tokens! TX: ${signature.slice(0, 8)}...`);
+        const tokensReceived = (data.tokensOut || 0) / 1e9;
+        toast.success(`Bought ${tokensReceived.toLocaleString()} ${tokenInfo.symbol}!`);
         setBuyAmount("");
 
       } else {
+        // SELL: User sends tokens to platform wallet, platform sends SOL to user
         const tokenAmountUnits = Math.floor(pendingTrade.inputAmount * 1e9);
         const mintPubkey = new PublicKey(activeMint);
-        const creatorPubkey = new PublicKey(tokenInfo.creatorWallet);
-
+        
+        // Platform wallet ATA to receive tokens
         const userATA = await getAssociatedTokenAddress(mintPubkey, publicKey);
-        const creatorATA = await getAssociatedTokenAddress(mintPubkey, creatorPubkey);
+        const platformATA = await getAssociatedTokenAddress(mintPubkey, PLATFORM_FEE_WALLET);
 
         const transaction = new Transaction();
 
+        // Create platform ATA if it doesn't exist
         try {
-          await getAccount(connection, creatorATA);
+          await getAccount(connection, platformATA);
         } catch {
           transaction.add(
             createAssociatedTokenAccountInstruction(
               publicKey,
-              creatorATA,
-              creatorPubkey,
+              platformATA,
+              PLATFORM_FEE_WALLET,
               mintPubkey
             )
           );
         }
 
+        // Transfer tokens to platform wallet
         transaction.add(
           createTransferInstruction(
             userATA,
-            creatorATA,
+            platformATA,
             publicKey,
             BigInt(tokenAmountUnits),
             [],
@@ -499,6 +505,7 @@ const TradePage = () => {
         const signature = await sendTransaction(transaction, connection);
         await connection.confirmTransaction(signature, "confirmed");
 
+        // Edge function will transfer SOL from platform wallet to user
         const { data, error } = await supabase.functions.invoke("execute-trade", {
           body: {
             mintAddress: activeMint,
@@ -516,7 +523,7 @@ const TradePage = () => {
         const usdVolume = solReceived * (solUsdPrice || 0);
         await updateTradingVolume(walletAddress, usdVolume);
         
-        toast.success(`Sold for ${solReceived.toFixed(4)} SOL! TX: ${signature.slice(0, 8)}...`);
+        toast.success(`Sold for ${solReceived.toFixed(4)} SOL (${formatUsd(solReceived)})!`);
         setSellAmount("");
       }
 
