@@ -21,9 +21,9 @@ import {
   PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 
-// Platform fee wallet
-const PLATFORM_FEE_WALLET = new PublicKey(
-  "GVHjPM3DfTnSFLMx72RcCCAViqWWsJ6ENKXRq7nWedEp"
+// Platform wallet - holds bonding curve reserves and receives fees
+const PLATFORM_WALLET = new PublicKey(
+  "FL2wxMs6q8sR2pfypRSWUpYN7qcpA52rnLYH9WLQufUc"
 );
 
 // Platform creation fee: 0.02 SOL
@@ -105,7 +105,7 @@ export async function createTokenWithMetaplex(
     )
   );
 
-  // 3. Create creator's token account (for receiving creator allocation)
+  // 3. Create creator's token account (for receiving creator allocation - 5%)
   tx.add(
     createAssociatedTokenAccountInstruction(
       creator, // payer
@@ -115,8 +115,18 @@ export async function createTokenWithMetaplex(
     )
   );
 
-  // 4. Mint 5% to creator's wallet
-  // The bonding curve reserves (95%) are tracked virtually in the database
+  // 4. Create platform wallet's token account (for holding bonding curve reserves - 95%)
+  const platformTokenAccount = await getAssociatedTokenAddress(mint, PLATFORM_WALLET);
+  tx.add(
+    createAssociatedTokenAccountInstruction(
+      creator, // payer
+      platformTokenAccount, // associated token account
+      PLATFORM_WALLET, // owner
+      mint // mint
+    )
+  );
+
+  // 5. Mint 5% to creator's wallet
   tx.add(
     createMintToInstruction(
       mint,
@@ -128,7 +138,19 @@ export async function createTokenWithMetaplex(
     )
   );
 
-  // 5. Create Metaplex metadata
+  // 6. Mint 95% to platform wallet (bonding curve reserves)
+  tx.add(
+    createMintToInstruction(
+      mint,
+      platformTokenAccount,
+      creator, // mint authority
+      INITIAL_TOKEN_RESERVES, // 950M tokens (95% of 1B)
+      [],
+      TOKEN_PROGRAM_ID
+    )
+  );
+
+  // 7. Create Metaplex metadata
   const metadataInstruction = createCreateMetadataAccountV3Instruction(
     {
       metadata: metadataAddress,
@@ -155,11 +177,11 @@ export async function createTokenWithMetaplex(
   );
   tx.add(metadataInstruction);
 
-  // 6. Transfer platform fee
+  // 8. Transfer platform creation fee
   tx.add(
     SystemProgram.transfer({
       fromPubkey: creator,
-      toPubkey: PLATFORM_FEE_WALLET,
+      toPubkey: PLATFORM_WALLET,
       lamports: CREATION_FEE,
     })
   );
