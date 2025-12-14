@@ -171,6 +171,9 @@ serve(async (req) => {
     const mintPubkey = new PublicKey(mintAddress);
     const userPubkey = new PublicKey(walletAddress);
 
+    console.log('Platform wallet public key:', platformWallet.publicKey.toString());
+    console.log('Expected platform wallet: FL2wxMs6q8sR2pfypRSWUpYN7qcpA52rnLYH9WLQufUc');
+
     const solReserves = Number(token.sol_reserves);
     const tokenReserves = Number(token.token_reserves);
 
@@ -194,6 +197,24 @@ serve(async (req) => {
       try {
         const platformATA = await getAssociatedTokenAddress(mintPubkey, platformWallet.publicKey);
         const userATA = await getAssociatedTokenAddress(mintPubkey, userPubkey);
+
+        console.log('Platform ATA:', platformATA.toString());
+        console.log('User ATA:', userATA.toString());
+
+        // Check platform wallet token balance first
+        try {
+          const platformAccountInfo = await getAccount(connection, platformATA);
+          console.log('Platform token balance:', platformAccountInfo.amount.toString());
+        } catch (e) {
+          console.error('Platform ATA does not exist or has no tokens!');
+          return new Response(
+            JSON.stringify({ 
+              error: 'Platform wallet has no tokens for this mint. Token may not have been set up correctly.',
+              details: 'The bonding curve wallet needs tokens to facilitate trades. Please ensure token creation completed successfully.'
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
         const transaction = new Transaction();
 
