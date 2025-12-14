@@ -1,5 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { 
+  Connection, 
+  Keypair, 
+  PublicKey, 
+  Transaction, 
+  SystemProgram,
+  sendAndConfirmTransaction 
+} from "https://esm.sh/@solana/web3.js@1.98.4";
+import { 
+  getAssociatedTokenAddress, 
+  createTransferInstruction,
+  createAssociatedTokenAccountInstruction,
+  getAccount,
+  TOKEN_PROGRAM_ID 
+} from "https://esm.sh/@solana/spl-token@0.4.14";
+import { decode as base58Decode } from "https://deno.land/std@0.168.0/encoding/base58.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,11 +26,8 @@ const corsHeaders = {
 const PLATFORM_FEE_BPS = 100; // 1% platform fee
 const BASIS_POINTS_DIVISOR = 10000;
 
-// Initial virtual reserves for $5k market cap at ~$200/SOL
-// Virtual SOL = 25 SOL, Virtual Tokens = 950M (95% of 1B supply)
-// Market cap = (sol_reserves / token_reserves) * total_supply = 25 SOL = ~$5k
-const INITIAL_VIRTUAL_SOL = 25_000_000_000; // 25 SOL in lamports
-const INITIAL_TOKEN_RESERVES = 950_000_000_000_000_000; // 950M tokens with 9 decimals
+// Solana devnet RPC
+const SOLANA_RPC_URL = "https://api.devnet.solana.com";
 
 interface TradeRequest {
   mintAddress: string;
@@ -87,6 +100,26 @@ function calculateSell(tokenAmount: number, solReserves: number, tokenReserves: 
   };
 }
 
+/**
+ * Get platform wallet keypair from environment
+ */
+function getPlatformWallet(): Keypair {
+  const privateKeyString = Deno.env.get('PLATFORM_WALLET_PRIVATE_KEY');
+  if (!privateKeyString) {
+    throw new Error('PLATFORM_WALLET_PRIVATE_KEY not configured');
+  }
+  
+  // Try to parse as JSON array first, then as base58
+  try {
+    const keyArray = JSON.parse(privateKeyString);
+    return Keypair.fromSecretKey(new Uint8Array(keyArray));
+  } catch {
+    // Try base58 decoding
+    const decoded = base58Decode(privateKeyString);
+    return Keypair.fromSecretKey(decoded);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -136,6 +169,15 @@ serve(async (req) => {
 
     let result: BondingCurveResult;
     let tradeRecord: any;
+    let platformTransferSignature: string | null = null;
+
+    // Initialize Solana connection and platform wallet
+    const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+    const platformWallet = getPlatformWallet();
+    const mintPubkey = new PublicKey(mintAddress);
+    const userPubkey = new PublicKey(walletAddress);
+    
+    console.log(`Platform wallet: ${platformWallet.publicKey.toString()}`);
 
     if (tradeType === 'buy') {
       result = calculateBuy(amount, solReserves, tokenReserves);
@@ -147,14 +189,58 @@ serve(async (req) => {
         );
       }
 
+      // Transfer tokens from platform wallet to user
+      try {
+        const platformATA = await getAssociatedTokenAddress(mintPubkey, platformWallet.publicKey);
+        const userATA = await getAssociatedTokenAddress(mintPubkey, userPubkey);
+        
+        const transaction = new Transaction();
+        
+        // Check if user has ATA, create if not
+        try {
+          await getAccount(connection, userATA);
+        } catch {
+          console.log('Creating user ATA for tokens...');
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              platformWallet.publicKey,
+              userATA,
+              userPubkey,
+              mintPubkey
+            )
+          );
+        }
+        
+        // Transfer tokens to user
+        transaction.add(
+          createTransferInstruction(
+            platformATA,
+            userATA,
+            platformWallet.publicKey,
+            BigInt(result.tokensOut),
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        platformTransferSignature = await sendAndConfirmTransaction(connection, transaction, [platformWallet]);
+        console.log(`Tokens transferred to user, sig: ${platformTransferSignature}`);
+        
+      } catch (transferError: any) {
+        console.error('Failed to transfer tokens to user:', transferError);
+        return new Response(
+          JSON.stringify({ error: `Token transfer failed: ${transferError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Store: amount = tokens received, price_lamports = SOL spent
-      // This allows calculating price per token as price_lamports / amount
       tradeRecord = {
         mint_address: mintAddress,
         wallet_address: walletAddress,
         trade_type: 'buy',
         amount: result.tokensOut,
-        price_lamports: amount, // SOL spent in lamports
+        price_lamports: amount,
         signature,
         token_id: token.id,
       };
@@ -171,13 +257,36 @@ serve(async (req) => {
         );
       }
 
+      // Transfer SOL from platform wallet to user
+      try {
+        const transaction = new Transaction();
+        
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: platformWallet.publicKey,
+            toPubkey: userPubkey,
+            lamports: result.solOut,
+          })
+        );
+        
+        platformTransferSignature = await sendAndConfirmTransaction(connection, transaction, [platformWallet]);
+        console.log(`SOL transferred to user, sig: ${platformTransferSignature}`);
+        
+      } catch (transferError: any) {
+        console.error('Failed to transfer SOL to user:', transferError);
+        return new Response(
+          JSON.stringify({ error: `SOL transfer failed: ${transferError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Store: amount = tokens sold, price_lamports = SOL received
       tradeRecord = {
         mint_address: mintAddress,
         wallet_address: walletAddress,
         trade_type: 'sell',
-        amount: amount, // tokens sold
-        price_lamports: result.solOut, // SOL received in lamports
+        amount: amount,
+        price_lamports: result.solOut,
         signature,
         token_id: token.id,
       };
@@ -225,6 +334,7 @@ serve(async (req) => {
       newSolReserves: result.newSolReserves,
       newTokenReserves: result.newTokenReserves,
       signature,
+      platformTransferSignature,
     };
 
     console.log('Trade completed successfully:', response);
