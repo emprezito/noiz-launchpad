@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  getAssociatedTokenAddress,
+  createTransferInstruction,
+  createAssociatedTokenAccountInstruction,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -9,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Music, Image, Check, Loader2, AlertCircle, Shield, AlertTriangle } from "lucide-react";
-import { createTokenWithMetaplex, CreateTokenParams } from "@/lib/solana/createToken";
+import { createTokenWithMetaplex, CreateTokenParams, PLATFORM_WALLET, TOTAL_SUPPLY } from "@/lib/solana/createToken";
 import { uploadTokenMetadata } from "@/lib/ipfsUpload";
 import { useSolPrice } from "@/hooks/useSolPrice";
 import { updateTaskProgress, ensureUserTasks } from "@/lib/taskUtils";
@@ -202,6 +208,57 @@ const CreatePage = () => {
 
       const walletAddress = publicKey.toString();
       const mintAddr = mintKeypair.publicKey.toString();
+
+      // Step 2: Transfer 95% of tokens to platform wallet for bonding curve
+      toast.info("Transferring tokens to bonding curve...");
+      
+      try {
+        const mintPubkey = mintKeypair.publicKey;
+        const creatorATA = await getAssociatedTokenAddress(mintPubkey, publicKey);
+        const platformATA = await getAssociatedTokenAddress(mintPubkey, PLATFORM_WALLET);
+        
+        const bondingCurveAllocation = (TOTAL_SUPPLY * BigInt(95)) / BigInt(100); // 95% to platform
+        
+        const transferTx = new Transaction();
+        
+        // Create platform ATA if needed
+        const platformATAInfo = await connection.getAccountInfo(platformATA);
+        if (!platformATAInfo) {
+          transferTx.add(
+            createAssociatedTokenAccountInstruction(
+              publicKey, // payer
+              platformATA,
+              PLATFORM_WALLET,
+              mintPubkey
+            )
+          );
+        }
+        
+        // Transfer 95% to platform wallet
+        transferTx.add(
+          createTransferInstruction(
+            creatorATA,
+            platformATA,
+            publicKey,
+            bondingCurveAllocation,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        transferTx.feePayer = publicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transferTx.recentBlockhash = blockhash;
+        
+        const transferSig = await sendTransaction(transferTx, connection);
+        await connection.confirmTransaction(transferSig, "confirmed");
+        
+        console.log("Transferred 95% tokens to platform wallet:", transferSig);
+      } catch (transferErr: any) {
+        console.error("Token transfer error:", transferErr);
+        toast.error("Token created but failed to transfer to bonding curve. Please try again.");
+        // Still save to DB but with a flag or warning
+      }
 
       // Save token to database with pump.fun style bonding curve
       // Initial: 25 SOL virtual reserves, 950M tokens = $5k market cap at $200/SOL
