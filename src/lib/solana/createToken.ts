@@ -29,11 +29,9 @@ export const PLATFORM_WALLET = new PublicKey(
 const CREATION_FEE = 0.02 * LAMPORTS_PER_SOL;
 
 // Token distribution:
-// - 95% goes to platform wallet for bonding curve trades
-// - 5% goes to creator
+// - 100% minted to creator initially
+// - Creator transfers 95% to platform wallet after creation (via edge function)
 export const INITIAL_VIRTUAL_SOL_RESERVES = 25 * LAMPORTS_PER_SOL; // 25 SOL virtual reserves for $5k market cap
-export const BONDING_CURVE_ALLOCATION = BigInt(950_000_000 * 1e9); // 950M tokens (95% for bonding curve)
-export const CREATOR_ALLOCATION = BigInt(50_000_000 * 1e9); // 50M tokens (5% to creator)
 export const TOTAL_SUPPLY = BigInt(1_000_000_000 * 1e9); // 1B total
 
 export interface CreateTokenParams {
@@ -57,8 +55,8 @@ function getMetadataAddress(mint: PublicKey): PublicKey {
 
 /**
  * Creates a new SPL token with Metaplex metadata.
- * Mints 95% to platform wallet (for bonding curve trades) and 5% to creator.
- * This enables real on-chain token transfers during trades.
+ * Mints 100% to creator wallet initially.
+ * Platform wallet handles transfers during buy/sell via edge function.
  */
 export async function createTokenWithMetaplex(
   connection: Connection,
@@ -72,19 +70,15 @@ export async function createTokenWithMetaplex(
   // Get minimum rent for mint account
   const lamports = await getMinimumBalanceForRentExemptMint(connection);
   
-  // Get associated token accounts
+  // Get creator's associated token account
   const creatorTokenAccount = await getAssociatedTokenAddress(mint, creator);
-  const platformTokenAccount = await getAssociatedTokenAddress(mint, PLATFORM_WALLET);
 
-  console.log("Creating token with real on-chain distribution:", {
+  console.log("Creating token with full supply to creator:", {
     mint: mint.toString(),
     metadataAddress: metadataAddress.toString(),
     creatorTokenAccount: creatorTokenAccount.toString(),
-    platformTokenAccount: platformTokenAccount.toString(),
     creator: creator.toString(),
-    platformWallet: PLATFORM_WALLET.toString(),
-    creatorAllocation: CREATOR_ALLOCATION.toString(),
-    bondingCurveAllocation: BONDING_CURVE_ALLOCATION.toString(),
+    totalSupply: TOTAL_SUPPLY.toString(),
   });
 
   const tx = new Transaction();
@@ -121,41 +115,19 @@ export async function createTokenWithMetaplex(
     )
   );
 
-  // 4. Create platform wallet's token account (for bonding curve)
-  tx.add(
-    createAssociatedTokenAccountInstruction(
-      creator, // payer
-      platformTokenAccount, // associated token account
-      PLATFORM_WALLET, // owner
-      mint // mint
-    )
-  );
-
-  // 5. Mint 5% to creator's wallet
+  // 4. Mint ALL tokens to creator's wallet
   tx.add(
     createMintToInstruction(
       mint,
       creatorTokenAccount,
       creator, // mint authority
-      CREATOR_ALLOCATION,
+      TOTAL_SUPPLY,
       [],
       TOKEN_PROGRAM_ID
     )
   );
 
-  // 6. Mint 95% to platform wallet (for bonding curve trades)
-  tx.add(
-    createMintToInstruction(
-      mint,
-      platformTokenAccount,
-      creator, // mint authority
-      BONDING_CURVE_ALLOCATION,
-      [],
-      TOKEN_PROGRAM_ID
-    )
-  );
-
-  // 7. Create Metaplex metadata
+  // 5. Create Metaplex metadata
   const metadataInstruction = createCreateMetadataAccountV3Instruction(
     {
       metadata: metadataAddress,
@@ -182,7 +154,7 @@ export async function createTokenWithMetaplex(
   );
   tx.add(metadataInstruction);
 
-  // 8. Transfer platform fee
+  // 6. Transfer platform fee
   tx.add(
     SystemProgram.transfer({
       fromPubkey: creator,
