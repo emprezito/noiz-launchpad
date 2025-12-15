@@ -1,16 +1,28 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PointsRewards from "@/components/PointsRewards";
 import { Button } from "@/components/ui/button";
-import { Trophy, Crown, Medal, Star, Users, Zap, TrendingUp } from "lucide-react";
+import { Trophy, Crown, Medal, Star, Users, Zap, TrendingUp, Music, Clock, Calendar, Play, Heart, Share2 } from "lucide-react";
 
 interface LeaderboardUser {
   wallet_address: string;
   total_points: number;
   rank: number;
+}
+
+interface TopClip {
+  id: string;
+  title: string;
+  creator: string;
+  cover_image_url: string | null;
+  likes: number;
+  plays: number;
+  shares: number;
+  total_engagement: number;
 }
 
 const BADGES = [
@@ -31,14 +43,53 @@ const getBadge = (points: number) => {
   return BADGES[0];
 };
 
+// Calculate time until Sunday midnight UTC
+const getCountdownToSunday = () => {
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // 0=Sunday
+  
+  // Calculate days until next Sunday
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  
+  const nextSunday = new Date(now);
+  nextSunday.setUTCDate(now.getUTCDate() + daysUntilSunday);
+  nextSunday.setUTCHours(0, 0, 0, 0);
+  
+  const diff = nextSunday.getTime() - now.getTime();
+  
+  if (diff <= 0) {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, isSunday: true };
+  }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  return { days, hours, minutes, seconds, isSunday: false };
+};
+
 const LeaderboardPage = () => {
   const { publicKey } = useWallet();
+  const navigate = useNavigate();
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
   const [userRank, setUserRank] = useState<LeaderboardUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [topClips, setTopClips] = useState<TopClip[]>([]);
+  const [loadingClips, setLoadingClips] = useState(true);
+  const [countdown, setCountdown] = useState(getCountdownToSunday());
+
+  // Countdown timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown(getCountdownToSunday());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     fetchLeaderboard();
+    fetchWeeklyTopClips();
   }, [publicKey]);
 
   const fetchLeaderboard = async () => {
@@ -59,7 +110,6 @@ const LeaderboardPage = () => {
 
       setLeaderboard(rankedData);
 
-      // Find current user's rank
       if (publicKey) {
         const userEntry = rankedData.find(
           (u) => u.wallet_address === publicKey.toString()
@@ -72,6 +122,41 @@ const LeaderboardPage = () => {
       console.error("Error fetching leaderboard:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWeeklyTopClips = async () => {
+    try {
+      // Get current week's Monday
+      const now = new Date();
+      const dayOfWeek = now.getUTCDay();
+      const monday = new Date(now);
+      if (dayOfWeek === 0) {
+        monday.setUTCDate(now.getUTCDate() - 6);
+      } else {
+        monday.setUTCDate(now.getUTCDate() - (dayOfWeek - 1));
+      }
+      monday.setUTCHours(0, 0, 0, 0);
+
+      const { data, error } = await supabase
+        .from("audio_clips")
+        .select("*")
+        .gte("created_at", monday.toISOString())
+        .order("likes", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      const clipsWithEngagement = (data || []).map(clip => ({
+        ...clip,
+        total_engagement: (clip.likes || 0) + (clip.plays || 0) + (clip.shares || 0),
+      })).sort((a, b) => b.total_engagement - a.total_engagement);
+
+      setTopClips(clipsWithEngagement);
+    } catch (error) {
+      console.error("Error fetching weekly clips:", error);
+    } finally {
+      setLoadingClips(false);
     }
   };
 
@@ -246,8 +331,114 @@ const LeaderboardPage = () => {
               </div>
             </div>
 
-            {/* Sidebar - Rewards & Tasks */}
+            {/* Sidebar - Weekly Clips & Rewards */}
             <div className="space-y-6">
+              {/* Weekly Top Clips Countdown */}
+              <div className="bg-card rounded-xl border border-border overflow-hidden">
+                <div className="bg-gradient-to-r from-primary/20 to-accent/20 p-4 border-b border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Music className="w-5 h-5 text-primary" />
+                    <h3 className="font-bold text-foreground">Weekly Top Clips</h3>
+                  </div>
+                  {countdown.isSunday ? (
+                    <div className="flex items-center gap-2 text-primary">
+                      <Calendar className="w-4 h-4" />
+                      <span className="text-sm font-semibold">📸 Snapshot Day!</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      <span className="text-sm">Snapshot in:</span>
+                    </div>
+                  )}
+                </div>
+                
+                {!countdown.isSunday && (
+                  <div className="p-4 bg-muted/50">
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="bg-background rounded-lg p-2">
+                        <p className="text-2xl font-bold text-primary">{countdown.days}</p>
+                        <p className="text-xs text-muted-foreground">Days</p>
+                      </div>
+                      <div className="bg-background rounded-lg p-2">
+                        <p className="text-2xl font-bold text-primary">{countdown.hours}</p>
+                        <p className="text-xs text-muted-foreground">Hours</p>
+                      </div>
+                      <div className="bg-background rounded-lg p-2">
+                        <p className="text-2xl font-bold text-primary">{countdown.minutes}</p>
+                        <p className="text-xs text-muted-foreground">Mins</p>
+                      </div>
+                      <div className="bg-background rounded-lg p-2">
+                        <p className="text-2xl font-bold text-primary">{countdown.seconds}</p>
+                        <p className="text-xs text-muted-foreground">Secs</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-4 space-y-3">
+                  {loadingClips ? (
+                    <div className="flex justify-center py-4">
+                      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : topClips.length === 0 ? (
+                    <p className="text-center text-muted-foreground text-sm py-4">
+                      No clips uploaded this week yet
+                    </p>
+                  ) : (
+                    topClips.map((clip, index) => (
+                      <div
+                        key={clip.id}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => navigate("/discover")}
+                      >
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          index === 0 ? "bg-yellow-500 text-yellow-950" :
+                          index === 1 ? "bg-gray-400 text-gray-900" :
+                          index === 2 ? "bg-amber-600 text-amber-950" :
+                          "bg-muted text-muted-foreground"
+                        }`}>
+                          {index + 1}
+                        </div>
+                        {clip.cover_image_url ? (
+                          <img
+                            src={clip.cover_image_url}
+                            alt={clip.title}
+                            className="w-10 h-10 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                            <Music className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate text-foreground">{clip.title}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-0.5">
+                              <Heart className="w-3 h-3" /> {clip.likes}
+                            </span>
+                            <span className="flex items-center gap-0.5">
+                              <Play className="w-3 h-3" /> {clip.plays}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-xs font-semibold text-primary">{clip.total_engagement}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="p-4 pt-0">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate("/discover")}
+                  >
+                    Upload & Compete
+                  </Button>
+                </div>
+              </div>
+
               <PointsRewards />
 
               {/* Badge Guide */}
