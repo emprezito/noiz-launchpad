@@ -1,13 +1,17 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MobileTabBar from "@/components/MobileTabBar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import TokensTab from "@/components/explore/TokensTab";
 import ClipsTab from "@/components/explore/ClipsTab";
 
 const ExplorePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const defaultTab = searchParams.get("tab") || "tokens";
 
   const handleTabChange = (value: string) => {
@@ -15,7 +19,7 @@ const ExplorePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16 md:pb-0">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <Navbar />
       <main className="pt-16 pb-8">
         <div className="container mx-auto px-4">
@@ -27,17 +31,28 @@ const ExplorePage = () => {
           </div>
 
           <Tabs defaultValue={defaultTab} onValueChange={handleTabChange}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="tokens">🎵 Tokens</TabsTrigger>
-              <TabsTrigger value="clips">🎧 Clips</TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between mb-4">
+              <TabsList>
+                <TabsTrigger value="tokens">🎵 Tokens</TabsTrigger>
+                <TabsTrigger value="clips">🎧 Clips</TabsTrigger>
+              </TabsList>
+              {defaultTab === "clips" && (
+                <Button size="sm" onClick={() => setShowUploadModal(true)}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  <span className="hidden sm:inline">Upload</span>
+                </Button>
+              )}
+            </div>
 
             <TabsContent value="tokens">
               <TokensTab />
             </TabsContent>
 
             <TabsContent value="clips">
-              <ClipsTab />
+              <ClipsTab 
+                showUploadModal={showUploadModal} 
+                setShowUploadModal={setShowUploadModal} 
+              />
             </TabsContent>
           </Tabs>
         </div>

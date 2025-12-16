@@ -120,3 +120,14 @@
 .wallet-button-wrapper .wallet-adapter-button {
   @apply !bg-primary !text-primary-foreground !font-medium !rounded-lg !px-4 !py-2 !h-auto;
 }
+
+/* Safe area support for mobile devices with notches */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
