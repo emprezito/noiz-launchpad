@@ -48,14 +48,18 @@ interface AudioClip {
 
 const CATEGORIES = ["All", "Memes", "Music", "Voice", "Sound Effects", "AI Generated", "Other"];
 
-const ClipsTab = () => {
+interface ClipsTabProps {
+  showUploadModal: boolean;
+  setShowUploadModal: (show: boolean) => void;
+}
+
+const ClipsTab = ({ showUploadModal, setShowUploadModal }: ClipsTabProps) => {
   const navigate = useNavigate();
   const { publicKey } = useWallet();
   const [clips, setClips] = useState<AudioClip[]>([]);
   const [filteredClips, setFilteredClips] = useState<AudioClip[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [playingClip, setPlayingClip] = useState<string | null>(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingClips, setLoadingClips] = useState(true);
 
@@ -282,19 +286,13 @@ const ClipsTab = () => {
       {/* Top Clips */}
       <TopClipsSection />
 
-      {/* Category Filter with Upload Button */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="flex gap-1.5 overflow-x-auto flex-1">
-          {CATEGORIES.map((cat) => (
-            <Button key={cat} onClick={() => setSelectedCategory(cat)} variant={selectedCategory === cat ? "default" : "outline"} size="sm" className="text-xs whitespace-nowrap">
-              {cat}
-            </Button>
-          ))}
-        </div>
-        <Button size="sm" onClick={() => setShowUploadModal(true)} className="shrink-0">
-          <Plus className="w-4 h-4 mr-1" />
-          <span className="hidden sm:inline">Upload</span>
-        </Button>
+      {/* Category Filter */}
+      <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4">
+        {CATEGORIES.map((cat) => (
+          <Button key={cat} onClick={() => setSelectedCategory(cat)} variant={selectedCategory === cat ? "default" : "outline"} size="sm" className="text-xs whitespace-nowrap">
+            {cat}
+          </Button>
+        ))}
       </div>
 
       {/* Clips Grid */}
