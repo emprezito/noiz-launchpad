@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BadgeLevel } from "@/lib/solana/metaplex";
+import { useWalletBalance } from "@/hooks/useWalletBalance";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MobileTabBar from "@/components/MobileTabBar";
@@ -12,7 +13,7 @@ import { toast } from "sonner";
 import { 
   User, Trophy, Star, Zap, TrendingUp, Medal, Crown, 
   Copy, Users, ArrowUpRight, ArrowDownLeft, Clock, Coins,
-  Loader2, Check, Download, Share2, X
+  Loader2, Check, Download, Share2, X, Wallet, Droplets
 } from "lucide-react";
 import {
   Dialog,
@@ -67,6 +68,7 @@ const BADGE_DEFINITIONS = [
 
 const ProfilePage = () => {
   const { publicKey, connected } = useWallet();
+  const { balance, loading: balanceLoading, refetch: refetchBalance } = useWalletBalance();
   const [loading, setLoading] = useState(true);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -78,6 +80,7 @@ const ProfilePage = () => {
   const [savingUsername, setSavingUsername] = useState(false);
   const [applyingReferral, setApplyingReferral] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
+  const [requestingAirdrop, setRequestingAirdrop] = useState(false);
 
   useEffect(() => {
     if (connected && publicKey) {
@@ -213,6 +216,28 @@ const ProfilePage = () => {
       toast.error("Failed to save username");
     } finally {
       setSavingUsername(false);
+    }
+  };
+
+  const requestAirdrop = async () => {
+    if (!publicKey) return;
+
+    setRequestingAirdrop(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("devnet-faucet", {
+        body: { walletAddress: publicKey.toBase58() },
+      });
+
+      if (error) throw new Error(error.message || "Faucet request failed");
+      if (data?.error) throw new Error(data.error);
+
+      toast.success(`Received ${data.amount} SOL! (Devnet)`);
+      setTimeout(() => refetchBalance(), 2000);
+    } catch (error: any) {
+      console.error("Faucet error:", error);
+      toast.error(error.message || "Faucet request failed. Try again later.");
+    } finally {
+      setRequestingAirdrop(false);
     }
   };
 
@@ -477,6 +502,36 @@ const ProfilePage = () => {
                     </Button>
                   </div>
                 </div>
+              </div>
+
+              {/* Wallet Balance & Faucet (Mobile-friendly) */}
+              <div className="bg-card rounded-xl border border-border p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Wallet className="w-5 h-5 text-primary" />
+                  <h3 className="font-bold text-foreground">Wallet</h3>
+                </div>
+                
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-muted-foreground">Balance</span>
+                  <span className="font-bold text-foreground">
+                    {balanceLoading ? "..." : `${balance?.toFixed(4) ?? "0"} SOL`}
+                  </span>
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={requestAirdrop}
+                  disabled={requestingAirdrop}
+                  className="w-full"
+                >
+                  {requestingAirdrop ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Droplets className="w-4 h-4 mr-2" />
+                  )}
+                  Get Devnet SOL
+                </Button>
               </div>
 
               {/* Referral Program */}
