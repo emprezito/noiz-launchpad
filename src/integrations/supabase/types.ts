@@ -98,6 +98,33 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          price_alerts_enabled: boolean | null
+          price_threshold: number | null
+          updated_at: string
+          wallet_address: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          price_alerts_enabled?: boolean | null
+          price_threshold?: number | null
+          updated_at?: string
+          wallet_address: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          price_alerts_enabled?: boolean | null
+          price_threshold?: number | null
+          updated_at?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string

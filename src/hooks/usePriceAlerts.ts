@@ -16,6 +16,7 @@ export function usePriceAlerts() {
   const { publicKey } = useWallet();
   const positionsRef = useRef<Map<string, TokenPosition>>(new Map());
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const enabledRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!publicKey) {
@@ -24,13 +25,26 @@ export function usePriceAlerts() {
         intervalRef.current = null;
       }
       positionsRef.current.clear();
+      enabledRef.current = false;
       return;
     }
 
     const walletAddress = publicKey.toBase58();
 
-    // Fetch user's token positions from trade history
+    // Check if user has opted in to notifications
+    const checkOptIn = async () => {
+      const { data } = await supabase
+        .from("notification_preferences")
+        .select("price_alerts_enabled")
+        .eq("wallet_address", walletAddress)
+        .maybeSingle();
+      
+      enabledRef.current = data?.price_alerts_enabled ?? false;
+    };
+
+    // Fetch user's token positions from trade history (only if opted in)
     const fetchPositions = async () => {
+      if (!enabledRef.current) return;
       // Get unique tokens the user has traded
       const { data: trades, error } = await supabase
         .from("trade_history")
@@ -116,10 +130,14 @@ export function usePriceAlerts() {
     };
 
     // Initial fetch
+    checkOptIn();
     fetchPositions();
 
-    // Check prices every 30 seconds
-    intervalRef.current = setInterval(fetchPositions, 30000);
+    // Check prices and opt-in status every 30 seconds
+    intervalRef.current = setInterval(() => {
+      checkOptIn();
+      fetchPositions();
+    }, 30000);
 
     return () => {
       if (intervalRef.current) {
