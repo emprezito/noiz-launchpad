@@ -256,7 +256,7 @@ const Portfolio = () => {
   const totalValue = holdings.reduce((sum, h) => sum + h.value, 0);
   const totalPnl = holdings.reduce((sum, h) => sum + h.pnl, 0);
   const totalValueUsd = solUsdPrice ? totalValue * solUsdPrice : 0;
-  const solBalanceUsd = solUsdPrice && solBalance ? solBalance * solUsdPrice : 0;
+  const solBalanceUsd = solUsdPrice && solBalance !== null ? solBalance * solUsdPrice : 0;
 
   return (
     <div className="min-h-screen bg-background">
