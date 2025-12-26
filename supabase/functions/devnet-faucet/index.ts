@@ -78,12 +78,14 @@ serve(async (req) => {
       console.log(`Rate limited: ${walletAddress}, next allowed in ${minutesRemaining} minutes`);
       
       return new Response(
-        JSON.stringify({ 
-          error: `Rate limited. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}.`,
+        JSON.stringify({
+          success: false,
+          rateLimited: true,
+          message: `Rate limited. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? "s" : ""}.`,
           nextAllowedAt: nextAllowed.toISOString(),
-          minutesRemaining
+          minutesRemaining,
         }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

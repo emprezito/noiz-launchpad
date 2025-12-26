@@ -68,6 +68,28 @@ const Navbar = () => {
         body: { walletAddress: publicKey.toBase58() },
       });
 
+      // Preferred path: backend returns 200 + rateLimited payload
+      if (data?.rateLimited) {
+        const minutes = typeof data.minutesRemaining === "number" ? data.minutesRemaining : null;
+        const nextAllowedAt = typeof data.nextAllowedAt === "string" ? data.nextAllowedAt : null;
+
+        if (minutes != null) {
+          toast.error(
+            `Please wait ${minutes} minute${minutes > 1 ? "s" : ""} before requesting again`
+          );
+          return;
+        }
+
+        if (nextAllowedAt) {
+          const t = new Date(nextAllowedAt);
+          toast.error(`Please wait until ${t.toLocaleTimeString()} to request again`);
+          return;
+        }
+
+        toast.error("Rate limited. Please try again later.");
+        return;
+      }
+
       // If the backend responded with an error status (e.g. 429), Supabase returns:
       // - data: null
       // - error: FunctionsHttpError
