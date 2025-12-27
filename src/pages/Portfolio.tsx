@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useWalletBalance } from "@/hooks/useWalletBalance";
 import { useSolPrice } from "@/hooks/useSolPrice";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TokenHolding {
@@ -54,6 +55,7 @@ const Portfolio = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [loadingPrefs, setLoadingPrefs] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { isSupported: pushSupported, isSubscribed: pushSubscribed, isLoading: pushLoading, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
 
   // Fetch user's notification preferences
   const fetchNotificationPrefs = useCallback(async () => {
@@ -89,6 +91,11 @@ const Portfolio = () => {
     } else {
       setNotificationsEnabled(newValue);
       toast.success(newValue ? "Price alerts enabled" : "Price alerts disabled");
+      
+      // If enabling and push notifications are supported but not subscribed, offer to subscribe
+      if (newValue && pushSupported && !pushSubscribed) {
+        subscribePush();
+      }
     }
     setLoadingPrefs(false);
   };

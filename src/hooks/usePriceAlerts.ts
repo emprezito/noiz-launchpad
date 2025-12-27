@@ -155,6 +155,7 @@ async function createNotification(
   type: string,
   tokenMint: string
 ) {
+  // Save to database
   const { error } = await supabase.from("notifications").insert({
     wallet_address: walletAddress,
     title,
@@ -165,5 +166,20 @@ async function createNotification(
 
   if (error) {
     console.error("Error creating notification:", error);
+  }
+
+  // Send push notification
+  try {
+    await supabase.functions.invoke("send-push-notification", {
+      body: {
+        walletAddress,
+        title,
+        body: message,
+        url: `/trade/${tokenMint}`,
+        tokenMint,
+      },
+    });
+  } catch (err) {
+    console.error("Error sending push notification:", err);
   }
 }
