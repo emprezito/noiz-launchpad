@@ -31,6 +31,46 @@ serve(async (req) => {
   }
 
   try {
+    // Handle GET request to show faucet wallet address
+    if (req.method === "GET") {
+      const privateKeyString = Deno.env.get("FAUCET_WALLET_PRIVATE_KEY");
+      if (!privateKeyString) {
+        return new Response(
+          JSON.stringify({ error: "Faucet not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      let faucetKeypair: Keypair;
+      try {
+        const privateKeyArray = JSON.parse(privateKeyString);
+        faucetKeypair = Keypair.fromSecretKey(new Uint8Array(privateKeyArray));
+      } catch {
+        try {
+          const { decode } = await import("https://esm.sh/bs58@5.0.0");
+          const privateKeyBytes = decode(privateKeyString);
+          faucetKeypair = Keypair.fromSecretKey(privateKeyBytes);
+        } catch {
+          return new Response(
+            JSON.stringify({ error: "Invalid faucet configuration" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      const connection = new Connection(DEVNET_RPC, "confirmed");
+      const balance = await connection.getBalance(faucetKeypair.publicKey);
+
+      return new Response(
+        JSON.stringify({
+          faucetAddress: faucetKeypair.publicKey.toBase58(),
+          balance: balance / LAMPORTS_PER_SOL,
+          balanceLamports: balance,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { walletAddress } = await req.json();
 
     if (!walletAddress) {
