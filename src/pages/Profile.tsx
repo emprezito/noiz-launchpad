@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { BadgeLevel } from "@/lib/solana/metaplex";
 import { useWalletBalance } from "@/hooks/useWalletBalance";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { clearMobileWalletCache } from "@/components/WalletButton";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -17,7 +19,8 @@ import { toast } from "sonner";
 import { 
   User, Trophy, Star, Zap, TrendingUp, Medal, Crown, 
   Copy, Users, ArrowUpRight, ArrowDownLeft, Clock,
-  Loader2, Wallet, Droplets, RefreshCw, Bell, BellOff, BellRing, Send
+  Loader2, Wallet, Droplets, RefreshCw, Bell, BellOff, BellRing, Send,
+  BarChart3
 } from "lucide-react";
 
 interface UserStats {
@@ -68,6 +71,7 @@ const ProfilePage = () => {
   const { publicKey, connected, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
   const { balance, loading: balanceLoading, refetch: refetchBalance } = useWalletBalance();
+  const { isEnabled } = useFeatureFlags();
   const { 
     isSupported: pushSupported, 
     isSubscribed: pushSubscribed, 
@@ -87,6 +91,8 @@ const ProfilePage = () => {
   const [applyingReferral, setApplyingReferral] = useState(false);
   const [requestingAirdrop, setRequestingAirdrop] = useState(false);
   const [sendingTestPush, setSendingTestPush] = useState(false);
+  
+  const userAnalyticsEnabled = isEnabled("user_analytics");
 
   useEffect(() => {
     if (connected && publicKey) {
@@ -460,13 +466,23 @@ const ProfilePage = () => {
       <main className="pt-24 pb-20 min-h-screen">
         <div className="container mx-auto px-4">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-foreground mb-2">
-              My Profile
-            </h1>
-            <p className="text-muted-foreground">
-              {formatWallet(publicKey?.toString() || "")}
-            </p>
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-4xl font-bold text-foreground mb-2">
+                My Profile
+              </h1>
+              <p className="text-muted-foreground">
+                {formatWallet(publicKey?.toString() || "")}
+              </p>
+            </div>
+            {userAnalyticsEnabled && (
+              <Link to="/my-analytics">
+                <Button variant="outline" className="gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  My Analytics
+                </Button>
+              </Link>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
