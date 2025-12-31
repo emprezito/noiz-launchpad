@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,7 +20,8 @@ import {
   AlertCircle,
   Play,
   Pause,
-  Volume2
+  Volume2,
+  Coins
 } from "lucide-react";
 
 interface RemixModalProps {
@@ -28,6 +30,8 @@ interface RemixModalProps {
   tokenId: string;
   mintAddress: string;
   tokenName: string;
+  originalAudioUrl?: string;
+  coverImageUrl?: string;
 }
 
 interface RemixVariation {
@@ -45,7 +49,16 @@ interface RemixVariation {
 const REMIX_FEE_WALLET = new PublicKey("5NC3whTedkRHALefgSPjRmV2WEfFMczBNQ2sYT4EdoD7");
 const REMIX_COST_SOL = 0.01;
 
-export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName }: RemixModalProps) => {
+export const RemixModal = ({ 
+  open, 
+  onOpenChange, 
+  tokenId, 
+  mintAddress, 
+  tokenName,
+  originalAudioUrl,
+  coverImageUrl 
+}: RemixModalProps) => {
+  const navigate = useNavigate();
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
   const [variations, setVariations] = useState<RemixVariation[]>([]);
@@ -67,6 +80,7 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
   useEffect(() => {
     if (open && tokenId) {
       fetchExistingRemixes();
+      setSelectedRemix(null);
     }
     // Cleanup audio on close
     if (!open && audioRef.current) {
@@ -118,14 +132,14 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
     }
   };
 
-  const handleCreateRemix = async (variation: RemixVariation) => {
+  const handleSelectVariation = async (variation: RemixVariation) => {
     if (!connected || !publicKey) {
       toast.error("Please connect your wallet first");
       return;
     }
 
+    // If already created, show it
     if (variation.isCreated) {
-      // Reset audio player when selecting a different remix
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -134,6 +148,13 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
       setSelectedRemix(variation);
       return;
     }
+
+    // Otherwise, generate the remix automatically
+    await generateRemix(variation);
+  };
+
+  const generateRemix = async (variation: RemixVariation) => {
+    if (!connected || !publicKey) return;
 
     setRemixing(variation.type);
 
@@ -158,7 +179,6 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
 
         const signature = await sendTransaction(transaction, connection);
         
-        // Wait for confirmation
         await connection.confirmTransaction({
           signature,
           blockhash,
@@ -206,13 +226,22 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
       // Refresh the list
       await fetchExistingRemixes();
       
-      // Show the created remix
-      setSelectedRemix({
+      // Show the created remix immediately
+      const createdRemix: RemixVariation = {
         ...variation,
         isCreated: true,
         remixConcept: data.remix?.remix_concept,
         remixAudioUrl: data.remix?.remix_audio_url,
-      });
+      };
+      
+      // Reset audio player
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+        setIsPlaying(false);
+      }
+      
+      setSelectedRemix(createdRemix);
 
     } catch (error) {
       console.error("Error creating remix:", error);
@@ -220,6 +249,34 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
     } finally {
       setRemixing(null);
     }
+  };
+
+  const handleMintAsToken = () => {
+    if (!selectedRemix || !selectedRemix.remixAudioUrl) {
+      toast.error("No remix audio available to mint");
+      return;
+    }
+
+    // Prepare data for the Create page with variation prefix
+    const remixTitle = `${selectedRemix.name} - ${tokenName}`;
+    
+    const mintData = {
+      title: remixTitle,
+      audioUrl: selectedRemix.remixAudioUrl,
+      coverImageUrl: coverImageUrl || null,
+      isRemix: true,
+      originalTokenId: tokenId,
+      originalMintAddress: mintAddress,
+      variationType: selectedRemix.type,
+    };
+
+    // Store in localStorage for Create page to pick up
+    localStorage.setItem("noizlabs_mint_audio", JSON.stringify(mintData));
+    
+    // Close modal and navigate to create page
+    onOpenChange(false);
+    navigate("/create");
+    toast.success(`Ready to mint "${remixTitle}" as a new token!`);
   };
 
   return (
@@ -237,7 +294,7 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : selectedRemix ? (
-          // Show remix details
+          // Show remix details with playback and mint option
           <div className="space-y-4">
             <Button 
               variant="ghost" 
@@ -259,13 +316,13 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
               <div className="flex items-center gap-3 mb-3">
                 {selectedRemix.icon}
                 <div>
-                  <h3 className="font-semibold">{selectedRemix.name} Remix</h3>
+                  <h3 className="font-semibold">{selectedRemix.name} - {tokenName}</h3>
                   <p className="text-sm text-muted-foreground">{selectedRemix.description}</p>
                 </div>
               </div>
 
               {/* Audio Player */}
-              {selectedRemix.remixAudioUrl && (
+              {selectedRemix.remixAudioUrl ? (
                 <div className="mt-4 p-3 bg-background/50 rounded-md">
                   <div className="flex items-center gap-3">
                     <Button
@@ -292,6 +349,13 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
                     </div>
                   </div>
                 </div>
+              ) : (
+                <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-muted-foreground">
+                    Audio generation is currently disabled. Ask admin to enable "AI Audio Remix" feature.
+                  </p>
+                </div>
               )}
               
               {selectedRemix.remixConcept && (
@@ -302,29 +366,36 @@ export const RemixModal = ({ open, onOpenChange, tokenId, mintAddress, tokenName
                   </p>
                 </div>
               )}
-
-              {!selectedRemix.remixAudioUrl && (
-                <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-muted-foreground">
-                    Audio generation is currently disabled. Ask admin to enable "AI Audio Remix" feature.
-                  </p>
-                </div>
-              )}
             </div>
+
+            {/* Mint as Token Button */}
+            {selectedRemix.remixAudioUrl && (
+              <Button 
+                onClick={handleMintAsToken}
+                className="w-full bg-primary hover:bg-primary/90"
+                size="lg"
+              >
+                <Coins className="w-5 h-5 mr-2" />
+                Mint as New Token
+              </Button>
+            )}
+            
+            <p className="text-xs text-muted-foreground text-center">
+              Minting creates a new token with this remix. Original creator earns 10% royalty on trades.
+            </p>
           </div>
         ) : (
           // Show variation grid
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Create unique AI-powered remix variations. Each token can have one remix per style.
+              Select a remix style to automatically generate the audio with AI. You can then preview it and mint as a new token.
             </p>
 
             <div className="grid grid-cols-2 gap-3">
               {variations.map((variation) => (
                 <button
                   key={variation.type}
-                  onClick={() => handleCreateRemix(variation)}
+                  onClick={() => handleSelectVariation(variation)}
                   disabled={remixing !== null}
                   className={`p-4 rounded-lg border text-left transition-all ${
                     variation.isCreated

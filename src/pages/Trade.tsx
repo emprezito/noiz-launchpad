@@ -50,6 +50,10 @@ interface TokenInfo {
   priceChange24h?: number;
   volume24h?: number;
   liquidity?: number;
+  isRemix?: boolean;
+  originalTokenId?: string;
+  originalTokenName?: string;
+  originalMintAddress?: string;
 }
 
 
@@ -391,6 +395,21 @@ const TradePage = () => {
           console.log("DexScreener data not available");
         }
         
+        // Fetch original token info if this is a remix
+        let originalTokenName: string | undefined;
+        let originalMintAddress: string | undefined;
+        if (token.is_remix && token.original_token_id) {
+          const { data: originalToken } = await supabase
+            .from("tokens")
+            .select("name, mint_address")
+            .eq("id", token.original_token_id)
+            .maybeSingle();
+          if (originalToken) {
+            originalTokenName = originalToken.name;
+            originalMintAddress = originalToken.mint_address;
+          }
+        }
+        
         setTokenDbId(token.id);
         setTokenInfo({
           name: token.name,
@@ -406,6 +425,10 @@ const TradePage = () => {
           priceChange24h,
           volume24h,
           liquidity,
+          isRemix: token.is_remix || false,
+          originalTokenId: token.original_token_id || undefined,
+          originalTokenName,
+          originalMintAddress,
         });
         
         // Auto-open remix modal if requested via URL param
@@ -836,6 +859,16 @@ const TradePage = () => {
                             AI Remix
                           </button>
                         )}
+                        {/* Remix Badge with Link to Original */}
+                        {tokenInfo.isRemix && tokenInfo.originalMintAddress && (
+                          <Link
+                            to={`/trade?mint=${tokenInfo.originalMintAddress}`}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 transition-colors"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            Remix of: {tokenInfo.originalTokenName || "Original"}
+                          </Link>
+                        )}
                       </div>
                       <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
@@ -994,6 +1027,8 @@ const TradePage = () => {
           tokenId={tokenDbId}
           mintAddress={tokenInfo.mint}
           tokenName={tokenInfo.name}
+          originalAudioUrl={tokenInfo.audioUri}
+          coverImageUrl={tokenInfo.imageUri}
         />
       )}
       <MobileTabBar />
