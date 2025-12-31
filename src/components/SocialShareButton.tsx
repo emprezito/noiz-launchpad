@@ -36,10 +36,22 @@ export const SocialShareButton = ({
 }: SocialShareButtonProps) => {
   const [copied, setCopied] = useState(false);
 
+  // Use custom domain for all shared links
+  const BASE_SHARE_URL = "https://noizlabs-io.vercel.app";
+
   const getShareUrl = () => {
-    if (url) return url;
-    if (mintAddress) return `${window.location.origin}/trade?mint=${mintAddress}`;
-    return window.location.href;
+    if (url) {
+      // If URL is provided, ensure it uses the custom domain
+      try {
+        const urlObj = new URL(url);
+        return `${BASE_SHARE_URL}${urlObj.pathname}${urlObj.search}`;
+      } catch {
+        return url;
+      }
+    }
+    if (mintAddress) return `${BASE_SHARE_URL}/trade?mint=${mintAddress}`;
+    // Use current path with custom domain
+    return `${BASE_SHARE_URL}${window.location.pathname}${window.location.search}`;
   };
 
   const formatPrice = (price: number) => {
